@@ -4,6 +4,7 @@ const os = require('os');
 const pty = require('node-pty');
 const EventEmitter = require('events');
 const { WSL_EXE, toWslPath } = require('./wsl');
+const { envWithFreshPath, getFreshPath } = require('./freshEnv');
 
 // key: agent name -> { proc, logs: string[] }
 const sessions = new Map();
@@ -15,7 +16,9 @@ function resolveClaudeExecutable() {
   if (process.platform !== 'win32') return 'claude';
 
   const exts = ['.exe', '.cmd', '.bat', ''];
-  const pathDirs = (process.env.PATH || '').split(path.delimiter);
+  // process.env.PATH는 이 앱이 시작될 때의 스냅샷이라, 방금 설치한 도구를 못 볼 수
+  // 있다 - 레지스트리에서 직접 최신 PATH를 읽어와 찾는다.
+  const pathDirs = getFreshPath().split(path.delimiter);
   for (const dir of pathDirs) {
     for (const ext of exts) {
       const candidate = path.join(dir, 'claude' + ext);
@@ -78,7 +81,7 @@ function startSession(agent, { cols = 100, rows = 30 } = {}) {
     cols,
     rows,
     cwd: agent.runtime === 'wsl' ? undefined : agent.folder,
-    env: process.env
+    env: envWithFreshPath()
   });
 
   sessions.set(agent.name, { proc, logBuffer: '' });

@@ -5,6 +5,7 @@ const pty = require('node-pty');
 const store = require('./store');
 const wsl = require('./wsl');
 const sessionManager = require('./sessionManager');
+const { envWithFreshPath } = require('./freshEnv');
 
 function slugify(name) {
   return name
@@ -303,7 +304,7 @@ function connectNotionWorkspace(name) {
       name: 'xterm-color',
       cols: 100,
       rows: 30,
-      env: process.env
+      env: envWithFreshPath()
     });
     return;
   }
@@ -311,7 +312,12 @@ function connectNotionWorkspace(name) {
   try {
     // claude가 npm 전역 설치본이면 claude.cmd라서, shell 없이 직접 실행하면
     // Windows에서 EINVAL이 난다 (배치 파일은 cmd.exe를 거쳐야 실행 가능).
-    execFileSync('claude', addArgs, { cwd: agent.folder, stdio: 'ignore', shell: true });
+    execFileSync('claude', addArgs, {
+      cwd: agent.folder,
+      stdio: 'ignore',
+      shell: true,
+      env: envWithFreshPath()
+    });
   } catch (e) {
     // 이미 등록돼 있으면 add가 실패하는데, 그래도 로그인은 계속 진행한다
   }
@@ -322,7 +328,7 @@ function connectNotionWorkspace(name) {
     cols: 100,
     rows: 30,
     cwd: agent.folder,
-    env: process.env
+    env: envWithFreshPath()
   });
 }
 
@@ -338,7 +344,8 @@ function getNotionMcpStatus(agent) {
       out = execFileSync('claude', ['mcp', 'get', 'notion'], {
         cwd: agent.folder,
         encoding: 'utf-8',
-        shell: true
+        shell: true,
+        env: envWithFreshPath()
       });
     }
     return /Connected/i.test(out) ? 'connected' : 'pending';
@@ -379,7 +386,8 @@ function refreshNotionWorkspaceLabel(name) {
         cwd: agent.folder,
         encoding: 'utf-8',
         timeout: 30000,
-        shell: true
+        shell: true,
+        env: envWithFreshPath()
       });
     }
     label = out.trim().split('\n')[0].trim().slice(0, 80);

@@ -6,6 +6,7 @@ const pty = require('node-pty');
 const EventEmitter = require('events');
 const store = require('./store');
 const sessionManager = require('./sessionManager');
+const { envWithFreshPath } = require('./freshEnv');
 
 // 첫 실행 마법사 전용 — 에이전트 세션과 별개로, "claude 로그인"을 진행할 동안만
 // 잠깐 띄우는 단발성 터미널. 에이전트 세션(sessionManager)의 sessions 맵과는
@@ -39,7 +40,7 @@ function markWizardDone(done = true) {
 
 function checkNode() {
   try {
-    const out = execFileSync('node', ['-v'], { encoding: 'utf-8', timeout: 10000 });
+    const out = execFileSync('node', ['-v'], { encoding: 'utf-8', timeout: 10000, env: envWithFreshPath() });
     return { ok: true, version: out.trim() };
   } catch (e) {
     return { ok: false };
@@ -52,7 +53,11 @@ function checkNode() {
 function checkClaude() {
   try {
     const exe = sessionManager.resolveClaudeExecutable();
-    const out = execClaudeFile(exe, ['--version'], { encoding: 'utf-8', timeout: 10000 });
+    const out = execClaudeFile(exe, ['--version'], {
+      encoding: 'utf-8',
+      timeout: 10000,
+      env: envWithFreshPath()
+    });
     return { ok: true, path: exe, version: out.trim() };
   } catch (e) {
     return { ok: false };
@@ -65,7 +70,8 @@ function installClaudeCli() {
     const out = execFileSync('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
       encoding: 'utf-8',
       timeout: 180000,
-      shell: true
+      shell: true,
+      env: envWithFreshPath()
     });
     return { ok: true, output: out };
   } catch (e) {
@@ -78,7 +84,8 @@ function installDiscordPlugin() {
     const exe = sessionManager.resolveClaudeExecutable();
     const out = execClaudeFile(exe, ['plugin', 'install', 'discord@claude-plugins-official'], {
       encoding: 'utf-8',
-      timeout: 60000
+      timeout: 60000,
+      env: envWithFreshPath()
     });
     return { ok: true, output: out };
   } catch (e) {
@@ -103,7 +110,11 @@ function resolveBunExecutable() {
 function checkBun() {
   try {
     const exe = resolveBunExecutable();
-    const out = execFileSync(exe, ['--version'], { encoding: 'utf-8', timeout: 10000 });
+    const out = execFileSync(exe, ['--version'], {
+      encoding: 'utf-8',
+      timeout: 10000,
+      env: envWithFreshPath()
+    });
     return { ok: true, version: out.trim() };
   } catch (e) {
     return { ok: false };
@@ -115,7 +126,7 @@ function installBun() {
     const out = execFileSync(
       'powershell.exe',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', 'irm bun.sh/install.ps1 | iex'],
-      { encoding: 'utf-8', timeout: 120000 }
+      { encoding: 'utf-8', timeout: 120000, env: envWithFreshPath() }
     );
     return { ok: true, output: out };
   } catch (e) {
@@ -128,7 +139,7 @@ function installBun() {
 function startLoginTerminal(cols = 100, rows = 24) {
   if (loginProc) return true;
   const exe = sessionManager.resolveClaudeExecutable();
-  loginProc = pty.spawn(exe, [], { name: 'xterm-color', cols, rows, env: process.env });
+  loginProc = pty.spawn(exe, [], { name: 'xterm-color', cols, rows, env: envWithFreshPath() });
   loginProc.onData((chunk) => emitter.emit('log', chunk));
   loginProc.onExit(() => {
     loginProc = null;
