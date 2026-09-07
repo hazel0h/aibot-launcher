@@ -1,6 +1,6 @@
 # 디코노션ai 런처
 
-Discord + Claude Code + Notion으로 개인 AI 에이전트를 운영하는 [디코노션ai](.) 프레임워크의 에이전트 생성/세션 관리용 데스크톱 앱(Electron, Windows 전용).
+Discord + Claude Code + Notion으로 개인 AI 에이전트를 운영하는 프레임워크의 에이전트 생성/세션 관리용 데스크톱 앱(Electron, Windows 전용).
 
 ## 할 수 있는 것
 
@@ -53,7 +53,6 @@ npm run release    # GitHub Release로 발행까지 (publish-token.local.json �
 
 - 데이터(에이전트 목록·설정)는 `data/launcher-data.json`에 저장됩니다. 이 파일은 개인 정보(디스코드 토큰, 상태 경로 등)를 담기 때문에 `.gitignore`에 포함되어 있고, 없으면 첫 실행 시 자동으로 새로 만들어집니다.
 - Windows 전용입니다 (WSL 실행 지원 포함 — macOS/Linux 지원은 없음).
-- 여러 명이 함께 쓰는 프레임워크의 배경/설계 원칙은 상위 폴더의 디코노션ai 문서를 참고하세요.
 
 ## 라이선스
 
