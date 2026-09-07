@@ -4,11 +4,15 @@ Discord + Claude Code + Notion으로 개인 AI 에이전트를 운영하는 프�
 
 ## 할 수 있는 것
 
+- **🚀 시작 가이드** 마법사: Node.js/Claude CLI/Claude 로그인/Discord 플러그인/Bun까지 버튼 클릭으로 확인·설치
 - 새 에이전트 생성: 이름·역할·Notion 역할 페이지 링크·Discord 봇 토큰을 입력하면 `.claude/settings.json` + `CLAUDE.md`를 자동 생성
-- 에이전트별 Claude Code 세션을 실제 터미널(대화형)로 시작/중지
+- 에이전트별 Claude Code 세션을 실제 터미널(대화형)로 시작/중지, 시작 시 CLAUDE.md/Notion 역할 페이지 자동 숙지 지시
+- Discord 접근 관리: 페어링 승인/거절, 허용된 사용자·채널 목록 관리 (메모 포함)
+- Notion 워크스페이스 연결: 브라우저 OAuth 자동 실행, 연결된 워크스페이스 이름 자동 조회
 - Windows 네이티브 또는 WSL 중 실행 환경 선택 (에이전트별로 다르게 지정 가능)
 - 이미 폴더만 있는(런처로 안 만든) 기존 에이전트를 자동 감지해서 가져오기
 - 트레이 상주 — 창을 닫아도 백그라운드에서 계속 실행
+- 자동 업데이트 — 새 버전이 나오면 앱이 알아서 확인하고 설치 여부를 물어봄
 
 ## 설치 (일반 사용자 — 추천)
 
@@ -20,10 +24,12 @@ Discord + Claude Code + Notion으로 개인 AI 에이전트를 운영하는 프�
 ## 사전 준비
 
 1. **Node.js** (18 이상 권장) — 이것만 미리 설치해두면 됩니다. (설치 파일로 설치한 경우엔 이것도 필요 없습니다 — Electron이 내장돼 있어서. Node.js는 Claude Code CLI 설치·실행에만 필요)
-2. 나머지(**Claude Code CLI 설치/확인**, **Claude 계정 로그인**, **Discord 채널 플러그인 설치**)는 앱을 처음 켜면 뜨는
+2. 나머지(**Claude Code CLI 설치/확인**, **Claude 계정 로그인**, **Discord 채널 플러그인 설치**, **Bun 런타임 확인/설치**)는 앱을 처음 켜면 뜨는
    **🚀 시작 가이드** 마법사 안에서 버튼 클릭으로 진행할 수 있습니다 (사이드바 하단에서 언제든 다시 열 수 있음).
    - Claude 로그인만은 실제 계정 인증이라 브라우저에서 승인 클릭 한 번은 직접 해야 합니다.
-3. WSL 쪽 에이전트를 쓸 계획이면 **WSL**과 그 안에 Claude Code CLI(+플러그인)가 별도로 설치되어 있어야 함 (Windows 쪽 설치와 완전히 별개, 시작 가이드는 Windows 쪽만 도와줍니다)
+   - **Bun은 왜 필요한가**: Discord/Telegram 채널 플러그인의 실제 연결 서버가 bun으로 실행되는 스크립트라, 이게 없으면 토큰이 맞아도 봇이 계속 오프라인으로 남습니다. 에러 메시지도 잘 안 보여서 원인 찾기가 까다로운 문제라 마법사에서 꼭 확인해주세요.
+   - 도구를 방금 설치했는데 마법사가 여전히 "설치 안 됨"이라고 하면, 앱을 완전히 종료했다가 다시 켜서 "다시 확인"을 눌러보세요 (Windows는 PATH가 바뀌어도 이미 떠 있던 프로세스는 재시작 전까지 못 봅니다 — v0.1.8부터는 이 경우도 최대한 자동으로 인식하도록 되어 있지만, 그래도 안 되면 재시작이 가장 확실합니다).
+3. WSL 쪽 에이전트를 쓸 계획이면 **WSL**과 그 안에 Claude Code CLI(+플러그인, +bun)가 별도로 설치되어 있어야 함 (Windows 쪽 설치와 완전히 별개, 시작 가이드는 Windows 쪽만 도와줍니다)
 
 ## 개발자용: 소스에서 직접 실행
 
@@ -40,19 +46,29 @@ npm start
 
 ```bash
 npm run dist       # 로컬 빌드만 (dist/ 폴더에 .exe 생성)
-npm run release    # GitHub Release로 발행까지 (publish-token.local.json 필요)
+npm run release    # 버전 태그로 draft 릴리스 생성 → 빌드 → 업로드 → 공개 전환까지 자동
 ```
+
+`npm run release`를 쓰려면 로컬에 아래 두 파일이 필요합니다 (둘 다 `.gitignore`에 포함되어 저장소에는 올라가지 않음):
+
+- `update-token.local.json` — GitHub 읽기 전용 토큰(Contents: Read-only). **설치 파일 안에 그대로 포함**되어, 설치된 앱이 새 버전을 확인할 때 씁니다.
+- `publish-token.local.json` — GitHub 쓰기 권한 토큰(Contents: Read and write). **이 컴퓨터에서 발행할 때만** 쓰이고, 배포되는 설치 파일 안에는 절대 포함되지 않습니다.
+
+두 파일 모두 형식은 `{ "token": "발급받은 토큰" }`이고, `https://github.com/settings/personal-access-tokens/new`에서 이 저장소만 선택해 발급받으면 됩니다.
+
+새 버전을 낼 때는 `package.json`의 `version`을 올린 뒤 `npm run release` 한 번이면 끝입니다. (electron-builder가 exe/blockmap을 동시에 업로드하면서 릴리스가 중복 생성되는 경쟁 상태가 있었는데, `scripts/release.js`가 빌드 전에 draft 릴리스를 미리 만들어두는 방식으로 해결해뒀습니다.)
 
 ## 첫 실행 후
 
 1. 사이드바 하단 **⚙ 설정**에서 에이전트 루트 폴더(기본값: `~/ClaudeAgents`)와 필요하면 WSL Discord 상태 경로("자동 감지" 버튼 사용)를 확인/설정
 2. **+ 새 에이전트**로 만들거나, 이미 있는 에이전트 폴더가 감지되면 사이드바의 "폴더에서 감지됨" 목록에서 **가져오기**
-3. 에이전트 선택 → **세션 시작** → 뜨는 터미널 안에서 (WSL/Windows 어느 쪽이든) 필요하면 `/discord:configure`, `/discord:access` 등으로 봇 페어링 진행
+3. 에이전트 선택 → **세션 시작**으로 세션을 켜고, **Discord 접근 관리** 버튼에서 페어링 승인/채널 등록을 진행 (터미널 안에서 `/discord:configure` 같은 슬래시 명령어를 직접 칠 필요 없음 — 그 명령어는 에이전트별 경로를 무시하고 기본 경로만 보는 알려진 버그가 있어서, 런처가 직접 올바른 파일에 기록하도록 되어 있습니다)
 
 ## 알아두면 좋은 것
 
-- 데이터(에이전트 목록·설정)는 `data/launcher-data.json`에 저장됩니다. 이 파일은 개인 정보(디스코드 토큰, 상태 경로 등)를 담기 때문에 `.gitignore`에 포함되어 있고, 없으면 첫 실행 시 자동으로 새로 만들어집니다.
+- 데이터(에이전트 목록·설정)는 설치 파일로 설치한 경우 Windows 표준 저장 위치(`%APPDATA%\디코노션ai 런처\data\launcher-data.json`)에, 개발 모드(`npm start`)로 실행한 경우 프로젝트 폴더 안 `data/launcher-data.json`에 저장됩니다. 개인 정보(디스코드 토큰, 상태 경로 등)를 담기 때문에 `.gitignore`에 포함되어 있고, 없으면 첫 실행 시 자동으로 새로 만들어집니다.
 - Windows 전용입니다 (WSL 실행 지원 포함 — macOS/Linux 지원은 없음).
+- 자동 업데이트는 이 저장소가 비공개라 GitHub 읽기 전용 토큰이 설치 파일 안에 포함되어 있습니다(`update-token.local.json`, 소스 저장소에는 안 올라감). 배포 관련 자세한 내용은 아래 "개발자용" 섹션 참고.
 
 ## 라이선스
 
