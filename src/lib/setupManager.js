@@ -8,6 +8,20 @@ const sessionManager = require('./sessionManager');
 // 잠깐 띄우는 단발성 터미널. 에이전트 세션(sessionManager)의 sessions 맵과는
 // 완전히 분리되어 있다 (특정 에이전트에 속하지 않는 로그인 절차이기 때문).
 const emitter = new EventEmitter();
+
+// exePath가 .cmd/.bat(예: npm 전역 설치본 claude.cmd)면 shell 없이는 실행 자체가 안
+// 되고(EINVAL), cmd.exe를 프로그램으로 두고 exePath를 인자 배열 항목으로 넘기는
+// 방법도 시도해봤지만 cmd.exe의 /c 재해석 규칙 때문에 경로에 공백이 있으면
+// ("C:\Users\Generic User\...") 여전히 깨진다(직접 재현해서 확인함). 실제로 되는
+// 방법은 shell: true를 쓰되 exePath를 우리가 직접 큰따옴표로 감싸는 것 - shell: true는
+// file/args를 그대로 이어붙이기만 하고 따옴표를 안 씌워주므로, 공백이 있는 경로는
+// 호출하는 쪽에서 직접 따옴표를 책임져야 한다(Node 공식 문서에 명시된 동작).
+function execClaudeFile(exePath, args, options) {
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(exePath)) {
+    return execFileSync(`"${exePath}"`, args, { ...options, shell: true });
+  }
+  return execFileSync(exePath, args, options);
+}
 let loginProc = null;
 
 function isWizardDone() {
@@ -30,12 +44,12 @@ function checkNode() {
 }
 
 // Claude Code CLI 설치 방식에 따라 실행 파일이 진짜 .exe(예: ~/.local/bin/claude.exe)일
-// 수도, npm 전역 설치의 배치 파일(claude.cmd)일 수도 있다. .cmd/.bat는 Windows가
-// shell(cmd.exe) 없이는 직접 실행 못 해서(EINVAL) - shell: true로 항상 통일한다.
+// 수도, npm 전역 설치의 배치 파일(claude.cmd)일 수도 있다. execClaudeFile()이 두 경우
+// 모두(공백이 포함된 경로 포함) 안전하게 처리한다.
 function checkClaude() {
   try {
     const exe = sessionManager.resolveClaudeExecutable();
-    const out = execFileSync(exe, ['--version'], { encoding: 'utf-8', timeout: 10000, shell: true });
+    const out = execClaudeFile(exe, ['--version'], { encoding: 'utf-8', timeout: 10000 });
     return { ok: true, path: exe, version: out.trim() };
   } catch (e) {
     return { ok: false };
@@ -59,10 +73,9 @@ function installClaudeCli() {
 function installDiscordPlugin() {
   try {
     const exe = sessionManager.resolveClaudeExecutable();
-    const out = execFileSync(exe, ['plugin', 'install', 'discord@claude-plugins-official'], {
+    const out = execClaudeFile(exe, ['plugin', 'install', 'discord@claude-plugins-official'], {
       encoding: 'utf-8',
-      timeout: 60000,
-      shell: true
+      timeout: 60000
     });
     return { ok: true, output: out };
   } catch (e) {
