@@ -283,7 +283,9 @@ function connectNotionWorkspace(name) {
   }
 
   try {
-    execFileSync('claude', addArgs, { cwd: agent.folder, stdio: 'ignore' });
+    // claude가 npm 전역 설치본이면 claude.cmd라서, shell 없이 직접 실행하면
+    // Windows에서 EINVAL이 난다 (배치 파일은 cmd.exe를 거쳐야 실행 가능).
+    execFileSync('claude', addArgs, { cwd: agent.folder, stdio: 'ignore', shell: true });
   } catch (e) {
     // 이미 등록돼 있으면 add가 실패하는데, 그래도 로그인은 계속 진행한다
   }
@@ -307,7 +309,11 @@ function getNotionMcpStatus(agent) {
         encoding: 'utf-8'
       });
     } else {
-      out = execFileSync('claude', ['mcp', 'get', 'notion'], { cwd: agent.folder, encoding: 'utf-8' });
+      out = execFileSync('claude', ['mcp', 'get', 'notion'], {
+        cwd: agent.folder,
+        encoding: 'utf-8',
+        shell: true
+      });
     }
     return /Connected/i.test(out) ? 'connected' : 'pending';
   } catch (e) {
@@ -346,7 +352,8 @@ function refreshNotionWorkspaceLabel(name) {
       out = execFileSync('claude', ['--print', '--permission-mode', 'bypassPermissions', prompt], {
         cwd: agent.folder,
         encoding: 'utf-8',
-        timeout: 30000
+        timeout: 30000,
+        shell: true
       });
     }
     label = out.trim().split('\n')[0].trim().slice(0, 80);

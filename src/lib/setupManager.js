@@ -29,10 +29,13 @@ function checkNode() {
   }
 }
 
+// Claude Code CLI 설치 방식에 따라 실행 파일이 진짜 .exe(예: ~/.local/bin/claude.exe)일
+// 수도, npm 전역 설치의 배치 파일(claude.cmd)일 수도 있다. .cmd/.bat는 Windows가
+// shell(cmd.exe) 없이는 직접 실행 못 해서(EINVAL) - shell: true로 항상 통일한다.
 function checkClaude() {
   try {
     const exe = sessionManager.resolveClaudeExecutable();
-    const out = execFileSync(exe, ['--version'], { encoding: 'utf-8', timeout: 10000 });
+    const out = execFileSync(exe, ['--version'], { encoding: 'utf-8', timeout: 10000, shell: true });
     return { ok: true, path: exe, version: out.trim() };
   } catch (e) {
     return { ok: false };
@@ -41,9 +44,7 @@ function checkClaude() {
 
 function installClaudeCli() {
   try {
-    // Windows에서 npm은 실제로 npm.cmd라서, shell 없이 execFileSync('npm', ...)로
-    // 호출하면 PATHEXT 확장자 해석이 안 돼 ENOENT가 난다 (node.exe는 확장자가
-    // 명시적이라 문제없이 찾아지는 것과 대조적). shell: true로 cmd.exe를 거치게 한다.
+    // npm도 마찬가지로 실제로는 npm.cmd라서 shell 없이는 못 찾는다(ENOENT).
     const out = execFileSync('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
       encoding: 'utf-8',
       timeout: 180000,
@@ -60,7 +61,8 @@ function installDiscordPlugin() {
     const exe = sessionManager.resolveClaudeExecutable();
     const out = execFileSync(exe, ['plugin', 'install', 'discord@claude-plugins-official'], {
       encoding: 'utf-8',
-      timeout: 60000
+      timeout: 60000,
+      shell: true
     });
     return { ok: true, output: out };
   } catch (e) {
