@@ -1,4 +1,7 @@
 const { execFileSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const pty = require('node-pty');
 const EventEmitter = require('events');
 const store = require('./store');
@@ -83,6 +86,43 @@ function installDiscordPlugin() {
   }
 }
 
+// Discord(및 Telegram) 채널 플러그인의 실제 서버는 bun으로 실행되는 스크립트다
+// (#!/usr/bin/env bun). node/claude가 멀쩡해도 bun이 없으면 그 서버 프로세스
+// 스폰 자체가 실패해서, 게이트웨이 연결 시도조차 못 하고 봇이 영원히 오프라인으로
+// 남는다 - 에러 메시지도 잘 안 보여서 원인 찾기가 특히 어려웠던 문제
+// (실제 사용자 컴퓨터에서 겪고 나서 이 체크를 추가함). 공식 설치 스크립트로
+// 깔면 %USERPROFILE%\.bun\bin\bun.exe로 진짜 실행 파일이 생겨서, npm/claude.cmd
+// 때와 달리 shell 관련 이슈가 없다.
+function resolveBunExecutable() {
+  const home = os.homedir();
+  const candidate = path.join(home, '.bun', 'bin', 'bun.exe');
+  if (fs.existsSync(candidate)) return candidate;
+  return 'bun'; // PATH에 있을 수도 있음 - execFileSync가 PATH에서 찾아줌
+}
+
+function checkBun() {
+  try {
+    const exe = resolveBunExecutable();
+    const out = execFileSync(exe, ['--version'], { encoding: 'utf-8', timeout: 10000 });
+    return { ok: true, version: out.trim() };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+
+function installBun() {
+  try {
+    const out = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', 'irm bun.sh/install.ps1 | iex'],
+      { encoding: 'utf-8', timeout: 120000 }
+    );
+    return { ok: true, output: out };
+  } catch (e) {
+    return { ok: false, error: (e.stderr || e.message || '').toString() };
+  }
+}
+
 // claude 로그인은 OAuth 방식이라 실제 tty가 있어야 브라우저 인증을 이어받을 수 있다
 // (--print/execFileSync처럼 파이프로 실행하면 "stdin isn't a terminal" 에러로 즉시 실패).
 function startLoginTerminal(cols = 100, rows = 24) {
@@ -119,6 +159,8 @@ module.exports = {
   checkClaude,
   installClaudeCli,
   installDiscordPlugin,
+  checkBun,
+  installBun,
   startLoginTerminal,
   stopLoginTerminal,
   writeLoginInput,

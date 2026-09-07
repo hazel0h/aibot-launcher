@@ -223,6 +223,17 @@
         <button id="btn-wizard-install-discord" class="btn primary">플러그인 설치</button>
       </div>
 
+      <h3>5. Bun 런타임 확인/설치</h3>
+      <p class="hint small">
+        Discord/Telegram 채널 플러그인의 실제 연결 서버가 bun으로 실행됩니다. 이게 없으면 토큰이 맞아도
+        봇이 계속 오프라인으로 남습니다(에러 메시지도 잘 안 보여서 원인 찾기 어려운 문제라 꼭 확인해주세요).
+      </p>
+      <div id="wizard-bun-status" class="check-result">확인 중...</div>
+      <div class="modal-actions" style="justify-content:flex-start;">
+        <button id="btn-wizard-check-bun" class="btn ghost">다시 확인</button>
+        <button id="btn-wizard-install-bun" class="btn primary">설치되어 있지 않다면: 설치하기</button>
+      </div>
+
       <div class="modal-actions">
         <button id="btn-wizard-close" class="btn ghost">닫기 (나중에 사이드바 "🚀 시작 가이드"로 다시 열기)</button>
       </div>

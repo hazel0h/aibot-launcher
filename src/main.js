@@ -183,6 +183,8 @@ ipcMain.handle('setup:checkNode', () => setupManager.checkNode());
 ipcMain.handle('setup:checkClaude', () => setupManager.checkClaude());
 ipcMain.handle('setup:installClaudeCli', () => setupManager.installClaudeCli());
 ipcMain.handle('setup:installDiscordPlugin', () => setupManager.installDiscordPlugin());
+ipcMain.handle('setup:checkBun', () => setupManager.checkBun());
+ipcMain.handle('setup:installBun', () => setupManager.installBun());
 ipcMain.handle('setup:startLoginTerminal', (_e, { cols, rows }) => {
   setupManager.startLoginTerminal(cols, rows);
   return true;

@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('api', {
     checkClaude: () => ipcRenderer.invoke('setup:checkClaude'),
     installClaudeCli: () => ipcRenderer.invoke('setup:installClaudeCli'),
     installDiscordPlugin: () => ipcRenderer.invoke('setup:installDiscordPlugin'),
+    checkBun: () => ipcRenderer.invoke('setup:checkBun'),
+    installBun: () => ipcRenderer.invoke('setup:installBun'),
     startLoginTerminal: (cols, rows) => ipcRenderer.invoke('setup:startLoginTerminal', { cols, rows }),
     stopLoginTerminal: () => ipcRenderer.invoke('setup:stopLoginTerminal'),
     writeLoginInput: (data) => ipcRenderer.invoke('setup:writeLoginInput', data),

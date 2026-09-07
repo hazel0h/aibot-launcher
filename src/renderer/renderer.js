@@ -577,10 +577,30 @@ el('btn-wizard-install-discord').addEventListener('click', async () => {
   setCheckResult('wizard-discord-status', true, '설치 완료 (이미 설치되어 있었어도 정상입니다)');
 });
 
+async function wizardCheckBun() {
+  const r = await window.api.setup.checkBun();
+  setCheckResult('wizard-bun-status', r.ok, r.ok ? `설치됨 (${r.version})` : '설치되어 있지 않음');
+}
+
+el('btn-wizard-check-bun').addEventListener('click', wizardCheckBun);
+
+el('btn-wizard-install-bun').addEventListener('click', async () => {
+  const btn = el('btn-wizard-install-bun');
+  btn.disabled = true;
+  setCheckResult('wizard-bun-status', true, '설치 중...');
+  const r = await window.api.setup.installBun();
+  btn.disabled = false;
+  if (!r.ok) {
+    setCheckResult('wizard-bun-status', false, `설치 실패: ${r.error}`);
+    return;
+  }
+  await wizardCheckBun();
+});
+
 async function openWizard() {
   el('modal-setup-wizard').classList.remove('hidden');
   setTimeout(() => setupFitAddon.fit(), 50);
-  await Promise.all([wizardCheckNode(), wizardCheckClaude()]);
+  await Promise.all([wizardCheckNode(), wizardCheckClaude(), wizardCheckBun()]);
 }
 
 el('btn-open-wizard').addEventListener('click', openWizard);
