@@ -41,9 +41,13 @@ function checkClaude() {
 
 function installClaudeCli() {
   try {
+    // Windows에서 npm은 실제로 npm.cmd라서, shell 없이 execFileSync('npm', ...)로
+    // 호출하면 PATHEXT 확장자 해석이 안 돼 ENOENT가 난다 (node.exe는 확장자가
+    // 명시적이라 문제없이 찾아지는 것과 대조적). shell: true로 cmd.exe를 거치게 한다.
     const out = execFileSync('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
       encoding: 'utf-8',
-      timeout: 180000
+      timeout: 180000,
+      shell: true
     });
     return { ok: true, output: out };
   } catch (e) {
