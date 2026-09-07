@@ -10,41 +10,37 @@ Discord + Claude Code + Notion으로 개인 AI 에이전트를 운영하는 [디
 - 이미 폴더만 있는(런처로 안 만든) 기존 에이전트를 자동 감지해서 가져오기
 - 트레이 상주 — 창을 닫아도 백그라운드에서 계속 실행
 
+## 설치 (일반 사용자 — 추천)
+
+1. [Releases](../../releases) 페이지에서 최신 `디코노션ai 런처 Setup x.x.x.exe` 다운로드
+2. 더블클릭 → 설치 (설치 위치, 바탕화면 아이콘 생성 여부 선택 가능)
+3. 설치 끝나면 바탕화면 아이콘으로 바로 실행 — 터미널, `npm install` 전혀 필요 없음
+4. 새 버전이 나오면 앱이 자동으로 확인해서 "업데이트할까요?" 팝업을 띄웁니다. 버튼 한 번이면 끝.
+
 ## 사전 준비
 
-1. **Node.js** (18 이상 권장) — 이것만 미리 설치해두면 됩니다.
+1. **Node.js** (18 이상 권장) — 이것만 미리 설치해두면 됩니다. (설치 파일로 설치한 경우엔 이것도 필요 없습니다 — Electron이 내장돼 있어서. Node.js는 Claude Code CLI 설치·실행에만 필요)
 2. 나머지(**Claude Code CLI 설치/확인**, **Claude 계정 로그인**, **Discord 채널 플러그인 설치**)는 앱을 처음 켜면 뜨는
    **🚀 시작 가이드** 마법사 안에서 버튼 클릭으로 진행할 수 있습니다 (사이드바 하단에서 언제든 다시 열 수 있음).
    - Claude 로그인만은 실제 계정 인증이라 브라우저에서 승인 클릭 한 번은 직접 해야 합니다.
 3. WSL 쪽 에이전트를 쓸 계획이면 **WSL**과 그 안에 Claude Code CLI(+플러그인)가 별도로 설치되어 있어야 함 (Windows 쪽 설치와 완전히 별개, 시작 가이드는 Windows 쪽만 도와줍니다)
 
-## 설치
+## 개발자용: 소스에서 직접 실행
+
+일반 사용자는 이 섹션이 필요 없습니다 (위 설치 파일로 충분). 코드를 직접 고치거나 빌드하려는 경우만 참고하세요.
 
 ```bash
 git clone <이 저장소 URL>
 cd LauncherApp
 npm install
-```
-
-## 실행
-
-개발/테스트용:
-
-```bash
 npm start
 ```
 
-⚠️ 이 방법은 터미널 창에 붙어서 실행되기 때문에, **그 터미널을 닫으면 앱도 같이 꺼집니다.**
+`npm start`는 터미널에 붙어서 실행되므로 터미널을 닫으면 앱도 꺼집니다. 설치 파일을 직접 빌드하려면:
 
-터미널 없이 완전히 백그라운드로 띄우려면, 아래 PowerShell 스니펫으로 바로가기(`.lnk`)를 한 번 만들어두고 그걸 더블클릭해서 쓰세요 (경로는 실제 설치 위치로 바꿔서 실행):
-
-```powershell
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("$PWD\런처 시작.lnk")
-$Shortcut.TargetPath = "$PWD\node_modules\electron\dist\electron.exe"
-$Shortcut.Arguments = "."
-$Shortcut.WorkingDirectory = "$PWD"
-$Shortcut.Save()
+```bash
+npm run dist       # 로컬 빌드만 (dist/ 폴더에 .exe 생성)
+npm run release    # GitHub Release로 발행까지 (publish-token.local.json 필요)
 ```
 
 ## 첫 실행 후

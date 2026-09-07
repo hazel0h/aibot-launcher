@@ -5,19 +5,53 @@
   "main": "src/main.js",
   "private": true,
   "license": "MIT",
+  "author": "hazel0h",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder",
+    "release": "node scripts/release.js"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^26.15.3"
   },
   "allowScripts": {
     "electron@33.4.11": true,
-    "node-pty@1.1.0": true
+    "node-pty@1.1.0": true,
+    "electron-winstaller@5.4.0": true
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "electron-updater": "^6.8.9",
     "node-pty": "^1.1.0"
+  },
+  "build": {
+    "appId": "com.hazel0h.aibotlauncher",
+    "productName": "디코노션ai 런처",
+    "npmRebuild": false,
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "update-token.local.json", "to": "update-token.local.json" }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "hazel0h",
+      "repo": "aibot-launcher",
+      "private": true
+    }
   }
 }

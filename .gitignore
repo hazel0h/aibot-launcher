@@ -13,3 +13,14 @@ Thumbs.db
 
 # 이 컴퓨터 전용 바로가기 (절대 경로가 박혀있어 다른 컴퓨터에선 무의미 - README 안내대로 각자 새로 생성)
 *.lnk
+
+# 비공개 저장소에서 자동 업데이트 확인용 GitHub 읽기 전용 토큰 - 절대 커밋 금지
+# (배포용 설치 파일에는 electron-builder의 extraResources로 포함되지만, 소스 저장소에는 올리지 않음)
+update-token.local.json
+
+# GitHub Release 발행(쓰기 권한) 전용 토큰 - 이 컴퓨터에서 배포할 때만 쓰고,
+# 설치 파일 안에는 절대 포함되지 않음 (scripts/release.js 참고)
+publish-token.local.json
+
+# electron-builder 빌드 결과물
+dist/

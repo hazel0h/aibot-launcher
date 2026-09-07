@@ -1,9 +1,19 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, dialog } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
 const agentManager = require('./lib/agentManager');
 const sessionManager = require('./lib/sessionManager');
 const setupManager = require('./lib/setupManager');
+const updateToken = require('./lib/updateToken');
+
+// 저장소가 비공개라 릴리스 확인 API 호출에도 인증이 필요하다. 이 토큰은
+// "Contents: Read-only"로만 스코프된 이 저장소 전용 토큰이어야 한다
+// (앱을 뜯어보면 누구나 꺼낼 수 있으므로, 절대 쓰기 권한을 주면 안 됨).
+if (updateToken) {
+  autoUpdater.requestHeaders = { authorization: `token ${updateToken}` };
+}
+autoUpdater.autoDownload = true;
 
 const TRAY_ICON_PATH = path.join(__dirname, '..', 'assets', 'icon.ico');
 
@@ -111,8 +121,32 @@ if (gotLock) {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
       else toggleWindow();
     });
+
+    // 개발 중(npm start, 패키징 안 된 상태)에는 업데이트 확인을 시도하면
+    // "찾을 수 없음" 에러만 나므로 실제로 설치된 앱에서만 확인한다.
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdates().catch(() => {});
+    }
   });
 }
+
+autoUpdater.on('update-downloaded', (info) => {
+  dialog
+    .showMessageBox(mainWindow, {
+      type: 'info',
+      title: '업데이트 준비됨',
+      message: `새 버전(${info.version})이 준비되었습니다. 지금 재시작해서 설치할까요?`,
+      buttons: ['지금 재시작', '나중에'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    .then(({ response }) => {
+      if (response === 0) {
+        isQuitting = true;
+        autoUpdater.quitAndInstall();
+      }
+    });
+});
 
 app.on('before-quit', () => {
   isQuitting = true;
