@@ -1,0 +1,23 @@
+{
+  "name": "aibot-launcher",
+  "version": "0.1.0",
+  "description": "디코노션ai 프레임워크 런처 앱 - 에이전트 생성 및 Claude Code 세션 관리",
+  "main": "src/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "node-pty@1.1.0": true
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0"
+  }
+}
