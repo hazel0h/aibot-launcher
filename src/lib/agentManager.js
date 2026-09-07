@@ -159,14 +159,40 @@ function listAgents() {
   return store.load().agents;
 }
 
-function deleteAgent(name, { removeFiles }) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function deleteAgent(name, { removeFiles }) {
   const data = store.load();
   const idx = data.agents.findIndex((a) => a.name === name);
   if (idx === -1) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
   const agent = data.agents[idx];
 
+  // 세션이 켜진 채로 폴더를 지우려 하면, claude 프로세스가 그 폴더를 cwd로
+  // 물고 있어서 Windows가 파일이 사용 중이라며 삭제를 거부한다(EBUSY/EPERM).
+  // 삭제 전에 먼저 세션을 중지시키고, 프로세스가 실제로 파일 핸들을 놓을
+  // 때까지(비동기라 즉시는 아님) 약간의 재시도 여유를 준다.
+  if (sessionManager.getStatus(name).running) {
+    try {
+      sessionManager.stopSession(name);
+    } catch (e) {
+      // 이미 죽어있는 등 - 무시하고 삭제 계속 진행
+    }
+    await sleep(500);
+  }
+
   if (removeFiles && fs.existsSync(agent.folder)) {
-    fs.rmSync(agent.folder, { recursive: true, force: true });
+    const attempts = 5;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        fs.rmSync(agent.folder, { recursive: true, force: true });
+        break;
+      } catch (e) {
+        if (i === attempts) throw e;
+        await sleep(400 * i);
+      }
+    }
   }
 
   data.agents.splice(idx, 1);

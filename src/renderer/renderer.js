@@ -187,7 +187,14 @@ el('btn-check-discord').addEventListener('click', async () => {
 el('btn-delete-agent').addEventListener('click', async () => {
   if (!currentAgent) return;
   const removeFiles = confirm(`"${currentAgent.name}"의 로컬 폴더까지 삭제할까요?\n확인=폴더까지 삭제, 취소=목록에서만 제거`);
-  await window.api.agents.delete(currentAgent.name, removeFiles);
+  const btn = el('btn-delete-agent');
+  btn.disabled = true;
+  const res = await window.api.agents.delete(currentAgent.name, removeFiles);
+  btn.disabled = false;
+  if (!res.ok) {
+    alert(`삭제 실패: ${res.error}`);
+    return;
+  }
   currentAgent = null;
   showView('view-empty');
   await refreshAgentList();

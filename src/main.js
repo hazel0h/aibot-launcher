@@ -219,9 +219,9 @@ ipcMain.handle('agents:update', (_e, { name, patch }) => {
   }
 });
 
-ipcMain.handle('agents:delete', (_e, { name, removeFiles }) => {
+ipcMain.handle('agents:delete', async (_e, { name, removeFiles }) => {
   try {
-    agentManager.deleteAgent(name, { removeFiles });
+    await agentManager.deleteAgent(name, { removeFiles });
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message };
