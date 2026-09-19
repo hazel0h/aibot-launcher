@@ -344,9 +344,10 @@ ipcMain.handle('settings:update', (_e, partial) => agentManager.updateSettings(p
 ipcMain.handle('settings:detectWslBase', () => agentManager.detectWslDiscordStateBase());
 
 // ---- IPC: sessions ----
-ipcMain.handle('session:start', (_e, { agent, cols, rows }) => {
+ipcMain.handle('session:start', async (_e, { agent, cols, rows }) => {
   try {
     agentManager.ensureDiscordConfigured(agent);
+    await agentManager.ensureSeparateClaudeReady(agent);
     sessionManager.startSession(agent, { cols, rows });
     return { ok: true };
   } catch (err) {

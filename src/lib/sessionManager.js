@@ -5,6 +5,7 @@ const pty = require('node-pty');
 const EventEmitter = require('events');
 const { WSL_EXE, toWslPath } = require('./wsl');
 const { envWithFreshPath, getFreshPath } = require('./freshEnv');
+const { agentClaudeEnv, wslEnvPrefix } = require('./claudeAccount');
 
 // key: agent name -> { proc, logs: string[] }
 const sessions = new Map();
@@ -51,7 +52,7 @@ function resolveCommand(agent) {
     // bun 같은 도구의 PATH가 .bashrc에서만 설정되는 경우(설치 스크립트 기본 동작)
     // 여기서 못 찾아 discord/telegram 플러그인이 조용히 실패하므로,
     // 실제 터미널을 열었을 때와 동일하게 -i(대화형)로 띄워 .bashrc가 항상 적용되게 한다.
-    const cmd = ['claude', ...CHANNEL_ARGS].join(' ');
+    const cmd = wslEnvPrefix(agent) + ['claude', ...CHANNEL_ARGS].join(' ');
     return {
       exe: WSL_EXE,
       args: ['--cd', toWslPath(agent.folder), '-e', 'bash', '-ic', cmd]
@@ -81,7 +82,7 @@ function startSession(agent, { cols = 100, rows = 30 } = {}) {
     cols,
     rows,
     cwd: agent.runtime === 'wsl' ? undefined : agent.folder,
-    env: envWithFreshPath()
+    env: envWithFreshPath(agentClaudeEnv(agent))
   });
 
   sessions.set(agent.name, { proc, logBuffer: '' });

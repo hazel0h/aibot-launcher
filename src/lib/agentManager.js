@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, execFile } = require('child_process');
 const pty = require('node-pty');
 const store = require('./store');
 const wsl = require('./wsl');
 const sessionManager = require('./sessionManager');
 const { envWithFreshPath } = require('./freshEnv');
+const { agentClaudeEnv, wslEnvPrefix, windowsConfigDir } = require('./claudeAccount');
 
 function slugify(name) {
   return name
@@ -74,7 +75,7 @@ function buildSettingsJson({ discordStateDir }) {
   ) + '\n';
 }
 
-function createAgent({ name, roleOneLiner, notionUrl, discordToken, runtime }) {
+function createAgent({ name, roleOneLiner, notionUrl, discordToken, runtime, separateClaude }) {
   const data = store.load();
 
   if (!name || !name.trim()) {
@@ -119,6 +120,7 @@ function createAgent({ name, roleOneLiner, notionUrl, discordToken, runtime }) {
     discordStateDir,
     discordToken: discordToken || '',
     autoReadOnStart: true,
+    separateClaude: !!separateClaude,
     createdAt: new Date().toISOString()
   };
 
@@ -127,7 +129,7 @@ function createAgent({ name, roleOneLiner, notionUrl, discordToken, runtime }) {
   return agent;
 }
 
-function updateAgent(name, { roleOneLiner, notionUrl, discordToken, autoReadOnStart }) {
+function updateAgent(name, { roleOneLiner, notionUrl, discordToken, autoReadOnStart, separateClaude }) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
@@ -135,6 +137,12 @@ function updateAgent(name, { roleOneLiner, notionUrl, discordToken, autoReadOnSt
   if (roleOneLiner !== undefined) agent.roleOneLiner = roleOneLiner;
   if (notionUrl !== undefined) agent.notionUrl = notionUrl;
   if (autoReadOnStart !== undefined) agent.autoReadOnStart = autoReadOnStart;
+  if (separateClaude !== undefined && !!separateClaude !== !!agent.separateClaude) {
+    // 공용<->전용 전환: 설정 폴더가 바뀌므로 플러그인 준비 여부와 Notion 워크스페이스 표시를 초기화
+    agent.separateClaude = !!separateClaude;
+    agent.claudePluginReady = false;
+    agent.notionWorkspaceLabel = '';
+  }
 
   const tokenChanged = discordToken !== undefined && discordToken !== agent.discordToken;
   if (discordToken !== undefined) agent.discordToken = discordToken;
@@ -241,6 +249,48 @@ function ensureDiscordConfigured(agent) {
   writeDiscordEnv(agent);
 }
 
+// claude를 비동기로 실행(UI가 멈추지 않게). .cmd/.bat는 shell + 직접 따옴표(공백 경로 대응).
+function runClaudeAsync(agent, args) {
+  return new Promise((resolve, reject) => {
+    const cb = (err, stdout, stderr) =>
+      err ? reject(new Error((stderr || err.message || '').toString().trim())) : resolve(stdout);
+    if (agent.runtime === 'wsl') {
+      const cmd = wslEnvPrefix(agent) + 'claude ' + args.join(' ');
+      execFile(wsl.WSL_EXE, ['-e', 'bash', '-ic', cmd], { encoding: 'utf-8', timeout: 180000 }, cb);
+      return;
+    }
+    const exe = sessionManager.resolveClaudeExecutable();
+    const env = envWithFreshPath(agentClaudeEnv(agent));
+    if (/\.(cmd|bat)$/i.test(exe)) {
+      execFile('"' + exe + '"', args, { encoding: 'utf-8', timeout: 180000, shell: true, env }, cb);
+    } else {
+      execFile(exe, args, { encoding: 'utf-8', timeout: 180000, env }, cb);
+    }
+  });
+}
+
+// 전용 Claude 계정(separateClaude) 에이전트는 설정 폴더가 새로 생기므로, 공용 폴더에 이미 깔려
+// 있던 Discord 채널 플러그인이 없다. 세션 시작 전에 (처음 한 번) 마켓플레이스를 추가하고
+// 플러그인을 설치해둔다. (로그인은 세션 터미널에서 claude가 직접 안내하므로 여기선 안 함)
+async function ensureSeparateClaudeReady(agentIn) {
+  if (!agentIn || !agentIn.separateClaude) return { skipped: true };
+  const data = store.load();
+  const agent = data.agents.find((a) => a.name === agentIn.name);
+  if (!agent || !agent.separateClaude || agent.claudePluginReady) return { skipped: true };
+
+  if (agent.runtime !== 'wsl') fs.mkdirSync(windowsConfigDir(agent), { recursive: true });
+  try {
+    await runClaudeAsync(agent, ['plugin', 'marketplace', 'add', 'anthropics/claude-plugins-official']);
+  } catch (e) {
+    // 이미 추가돼 있으면 실패할 수 있음 - 설치 단계에서 진짜 문제는 걸러진다
+  }
+  await runClaudeAsync(agent, ['plugin', 'install', 'discord@claude-plugins-official']);
+
+  agent.claudePluginReady = true;
+  store.save(data);
+  return { ready: true };
+}
+
 // ---- Discord 채널(길드 채널 멘션 반응) 관리 ----
 // 채널을 추가/삭제하면 access.json에 바로 반영된다(재시작 불필요 - 메시지마다 다시 읽는 구조).
 // 메모는 access.json 스키마에 없는 필드라 런처 자체 데이터(agent.discordChannelLabels)에 보관한다.
@@ -292,7 +342,7 @@ function connectNotionWorkspace(name) {
   if (agent.runtime === 'wsl') {
     const wslFolder = wsl.toWslPath(agent.folder);
     try {
-      execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && claude ${addArgs.join(' ')}`], {
+      execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude ${addArgs.join(' ')}`], {
         stdio: 'ignore'
       });
     } catch (e) {
@@ -300,11 +350,11 @@ function connectNotionWorkspace(name) {
     }
     // claude mcp login은 "stdin이 터미널이어야" 진행되는 대화형 명령이라
     // 일반 child_process(파이프/ignore)로는 즉시 거부된다. 실제 터미널(pty)로 띄운다.
-    pty.spawn(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && claude mcp login notion`], {
+    pty.spawn(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp login notion`], {
       name: 'xterm-color',
       cols: 100,
       rows: 30,
-      env: envWithFreshPath()
+      env: envWithFreshPath(agentClaudeEnv(agent))
     });
     return;
   }
@@ -316,7 +366,7 @@ function connectNotionWorkspace(name) {
       cwd: agent.folder,
       stdio: 'ignore',
       shell: true,
-      env: envWithFreshPath()
+      env: envWithFreshPath(agentClaudeEnv(agent))
     });
   } catch (e) {
     // 이미 등록돼 있으면 add가 실패하는데, 그래도 로그인은 계속 진행한다
@@ -328,7 +378,7 @@ function connectNotionWorkspace(name) {
     cols: 100,
     rows: 30,
     cwd: agent.folder,
-    env: envWithFreshPath()
+    env: envWithFreshPath(agentClaudeEnv(agent))
   });
 }
 
@@ -337,7 +387,7 @@ function getNotionMcpStatus(agent) {
     let out;
     if (agent.runtime === 'wsl') {
       const wslFolder = wsl.toWslPath(agent.folder);
-      out = execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && claude mcp get notion`], {
+      out = execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp get notion`], {
         encoding: 'utf-8'
       });
     } else {
@@ -345,7 +395,7 @@ function getNotionMcpStatus(agent) {
         cwd: agent.folder,
         encoding: 'utf-8',
         shell: true,
-        env: envWithFreshPath()
+        env: envWithFreshPath(agentClaudeEnv(agent))
       });
     }
     return /Connected/i.test(out) ? 'connected' : 'pending';
@@ -378,7 +428,7 @@ function refreshNotionWorkspaceLabel(name) {
       const wslFolder = wsl.toWslPath(agent.folder);
       out = execFileSync(
         wsl.WSL_EXE,
-        ['-e', 'bash', '-ic', `cd '${wslFolder}' && claude --print --permission-mode bypassPermissions '${prompt}'`],
+        ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude --print --permission-mode bypassPermissions '${prompt}'`],
         { encoding: 'utf-8', timeout: 30000 }
       );
     } else {
@@ -387,7 +437,7 @@ function refreshNotionWorkspaceLabel(name) {
         encoding: 'utf-8',
         timeout: 30000,
         shell: true,
-        env: envWithFreshPath()
+        env: envWithFreshPath(agentClaudeEnv(agent))
       });
     }
     label = out.trim().split('\n')[0].trim().slice(0, 80);
@@ -594,6 +644,7 @@ module.exports = {
   deleteAgent,
   checkDiscordStateDir,
   ensureDiscordConfigured,
+  ensureSeparateClaudeReady,
   getDiscordAccess,
   approvePairing,
   denyPairing,

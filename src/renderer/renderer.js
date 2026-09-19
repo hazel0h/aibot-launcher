@@ -113,7 +113,8 @@ async function selectAgent(name) {
   notionLink.textContent = currentAgent.notionUrl || '(없음)';
   notionLink.href = currentAgent.notionUrl || '#';
   el('meta-discord-dir').textContent = currentAgent.discordStateDir;
-  el('meta-runtime').textContent = currentAgent.runtime === 'wsl' ? 'WSL' : 'Windows';
+  el('meta-runtime').textContent =
+    (currentAgent.runtime === 'wsl' ? 'WSL' : 'Windows') + (currentAgent.separateClaude ? ' · 전용 Claude 계정' : ' · 공용 Claude 계정');
   el('discord-check-result').textContent = '';
   el('discord-check-result').className = 'check-result';
 
@@ -154,7 +155,13 @@ el('btn-start').addEventListener('click', async () => {
   if (!currentAgent) return;
   fitTerminal();
   term.reset();
+  if (currentAgent.separateClaude && !currentAgent.claudePluginReady) {
+    term.write('\r\n[전용 Claude 환경 준비 중... (처음 한 번 플러그인 설치, 최대 1~2분)]\r\n');
+  }
   const res = await window.api.session.start(currentAgent, term.cols, term.rows);
+  if (res.ok && currentAgent.separateClaude) {
+    currentAgent.claudePluginReady = true;
+  }
   if (!res.ok) alert(res.error);
   term.focus();
 });
@@ -206,6 +213,7 @@ el('btn-new-agent').addEventListener('click', () => {
   el('new-role').value = '';
   el('new-notion').value = '';
   el('new-token').value = '';
+  el('new-separate-claude').checked = false;
   el('new-runtime').value = 'windows';
   el('new-agent-error').classList.add('hidden');
   el('modal-new-agent').classList.remove('hidden');
@@ -221,7 +229,8 @@ el('btn-create-agent').addEventListener('click', async () => {
     roleOneLiner: el('new-role').value.trim(),
     notionUrl: el('new-notion').value.trim(),
     discordToken: el('new-token').value,
-    runtime: el('new-runtime').value
+    runtime: el('new-runtime').value,
+    separateClaude: el('new-separate-claude').checked
   };
   const res = await window.api.agents.create(payload);
   if (!res.ok) {
@@ -243,6 +252,7 @@ el('btn-edit-agent').addEventListener('click', () => {
   el('edit-token').value = '';
   el('edit-notion-workspace-label').value = currentAgent.notionWorkspaceLabel || '';
   el('edit-auto-read').checked = currentAgent.autoReadOnStart !== false;
+  el('edit-separate-claude').checked = !!currentAgent.separateClaude;
   el('edit-agent-error').classList.add('hidden');
   el('modal-edit-agent').classList.remove('hidden');
 });
@@ -256,7 +266,8 @@ el('btn-save-edit').addEventListener('click', async () => {
   const patch = {
     roleOneLiner: el('edit-role').value.trim(),
     notionUrl: el('edit-notion').value.trim(),
-    autoReadOnStart: el('edit-auto-read').checked
+    autoReadOnStart: el('edit-auto-read').checked,
+    separateClaude: el('edit-separate-claude').checked
   };
   const token = el('edit-token').value;
   if (token) patch.discordToken = token;

@@ -99,6 +99,10 @@
           <option value="wsl">WSL</option>
         </select>
       </label>
+      <label style="flex-direction: row; align-items: center; gap: 8px;">
+        <input id="new-separate-claude" type="checkbox" style="width: auto;" />
+        이 에이전트 전용 Claude 계정 사용 (다른 에이전트와 로그인·Notion 연결 분리)
+      </label>
       <p class="hint small">
         Discord 봇 생성과 Notion 역할 페이지 준비는 직접 하신 뒤, 결과물(토큰/URL)만 입력해주세요.
       </p>
@@ -132,6 +136,16 @@
         <input id="edit-auto-read" type="checkbox" style="width: auto;" />
         세션 시작 시 자동으로 CLAUDE.md/Notion 역할 페이지 읽게 하기
       </label>
+
+      <label style="flex-direction: row; align-items: center; gap: 8px;">
+        <input id="edit-separate-claude" type="checkbox" style="width: auto;" />
+        이 에이전트 전용 Claude 계정 사용
+      </label>
+      <p class="hint small">
+        · 켜면 이 에이전트만 별도 Claude 로그인·Notion 연결·플러그인을 씁니다 (다른 에이전트 계정에 영향 없음)<br />
+        · 켠 뒤 첫 세션 시작 때 플러그인이 자동 설치되고, 세션 터미널에서 이 에이전트용 Claude 계정으로 로그인하면 됩니다. Notion도 이 에이전트에서 다시 연결해야 합니다.<br />
+        · 끄면 다시 공용(기본) 계정을 씁니다
+      </p>
 
       <h3>Notion 워크스페이스</h3>
       <label>현재 연결된 워크스페이스 (여기서는 수정 불가)

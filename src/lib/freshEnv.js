@@ -34,8 +34,8 @@ function getFreshPath() {
 
 // 자식 프로세스(claude 등)에 넘길 env 객체를 만든다 - process.env를 그대로 쓰되
 // PATH만 레지스트리 기준 최신값으로 교체한다.
-function envWithFreshPath() {
-  return { ...process.env, PATH: getFreshPath() };
+function envWithFreshPath(extra = {}) {
+  return { ...process.env, PATH: getFreshPath(), ...extra };
 }
 
 module.exports = { getFreshPath, envWithFreshPath };
