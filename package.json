@@ -1,6 +1,6 @@
 {
   "name": "aibot-launcher",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "디코노션ai 프레임워크 런처 앱 - 에이전트 생성 및 Claude Code 세션 관리",
   "main": "src/main.js",
   "private": true,
@@ -48,7 +48,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "디코노션ai 런처"
     },
     "publish": {
       "provider": "github",
