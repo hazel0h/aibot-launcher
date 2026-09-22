@@ -244,8 +244,29 @@ function writeDiscordEnv(agent) {
   }
 }
 
-// 세션 시작 직전에 호출하면, claude가 부팅하면서 바로 올바른 토큰을 읽는다.
+// .claude/settings.json은 에이전트 생성 시 딱 한 번만 써지고 그 뒤로는 launcher-data.json과
+// 동기화되는 지점이 없었다. 다른 PC에서 폴더를 복사해오거나(사용자명이 달라 경로가 안 맞음),
+// launcher-data.json 쪽 값만 나중에 바뀌는 경우 settings.json이 옛 DISCORD_STATE_DIR을 계속
+// 들고 있게 되어 - 세션은 이 파일을 보고 뜨기 때문에 토큰/access.json은 launcher-data.json이
+// 가리키는 "맞는" 경로에 있는데 정작 세션은 "틀린"(존재하지 않는) 경로를 보는 불일치가
+// 생겼다(실사용자 리포트로 확인). launcher-data.json의 discordStateDir을 항상 정답으로 두고,
+// 세션 시작 때마다 settings.json을 그 값으로 덮어써서 어긋날 수 없게 한다.
+function syncAgentSettingsJson(agent) {
+  const settingsPath = path.join(agent.folder, '.claude', 'settings.json');
+  let parsed = {};
+  try {
+    parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  } catch (e) {
+    // 파일이 없거나 손상됐으면 새로 만든다 - env 외 다른 키는 있으면 그대로 보존
+  }
+  parsed.env = { ...(parsed.env || {}), DISCORD_STATE_DIR: agent.discordStateDir };
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+}
+
+// 세션 시작 직전에 호출하면, claude가 부팅하면서 바로 올바른 토큰/경로를 읽는다.
 function ensureDiscordConfigured(agent) {
+  syncAgentSettingsJson(agent);
   writeDiscordEnv(agent);
 }
 
