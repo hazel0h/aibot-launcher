@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('api', {
     listDiscordChannels: (name) => ipcRenderer.invoke('agents:listDiscordChannels', name),
     addDiscordChannel: (name, channelIdOrLink, label) => ipcRenderer.invoke('agents:addDiscordChannel', { name, channelIdOrLink, label }),
     removeDiscordChannel: (name, channelId) => ipcRenderer.invoke('agents:removeDiscordChannel', { name, channelId }),
+    setChannelRequireMention: (name, channelId, requireMention) =>
+      ipcRenderer.invoke('agents:setChannelRequireMention', { name, channelId, requireMention }),
     connectNotionWorkspace: (name) => ipcRenderer.invoke('agents:connectNotionWorkspace', name),
     refreshNotionWorkspaceLabel: (name) => ipcRenderer.invoke('agents:refreshNotionWorkspaceLabel', name),
     scanUnregistered: () => ipcRenderer.invoke('agents:scanUnregistered'),

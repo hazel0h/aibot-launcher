@@ -302,7 +302,26 @@ function listDiscordChannels(name) {
 
   const access = readAccessJson(agent);
   const labels = agent.discordChannelLabels || {};
-  return Object.keys(access.groups || {}).map((id) => ({ id, label: labels[id] || '' }));
+  return Object.keys(access.groups || {}).map((id) => ({
+    id,
+    label: labels[id] || '',
+    // 기본값은 true(멘션 필요) - 기존에 이 필드 없이 저장된 채널도 안전하게 처리
+    requireMention: access.groups[id].requireMention !== false
+  }));
+}
+
+// 채널의 "멘션 필요" 여부를 바꾼다. false로 끄면 그 채널의 모든 메시지에 멘션 없이도
+// 바로 답장한다(1:1 채팅처럼 무조건 응답) - access.json은 메시지마다 다시 읽으므로
+// 재시작 없이 즉시 반영된다.
+function setChannelRequireMention(name, channelId, requireMention) {
+  const data = store.load();
+  const agent = data.agents.find((a) => a.name === name);
+  if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
+
+  const access = readAccessJson(agent);
+  if (!access.groups[channelId]) throw new Error(`등록되지 않은 채널입니다: ${channelId}`);
+  access.groups[channelId].requireMention = !!requireMention;
+  writeAccessJson(agent, access);
 }
 
 function addDiscordChannel(name, channelIdOrLink, label) {
@@ -653,6 +672,7 @@ module.exports = {
   listDiscordChannels,
   addDiscordChannel,
   removeDiscordChannel,
+  setChannelRequireMention,
   connectNotionWorkspace,
   refreshNotionWorkspaceLabel,
   scanUnregisteredAgents,

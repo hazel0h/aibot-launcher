@@ -317,6 +317,15 @@ ipcMain.handle('agents:removeDiscordChannel', (_e, { name, channelId }) => {
   }
 });
 
+ipcMain.handle('agents:setChannelRequireMention', (_e, { name, channelId, requireMention }) => {
+  try {
+    agentManager.setChannelRequireMention(name, channelId, requireMention);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('agents:connectNotionWorkspace', (_e, name) => {
   try {
     agentManager.connectNotionWorkspace(name);

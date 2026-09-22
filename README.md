@@ -7,7 +7,7 @@ Discord + Claude Code + Notion으로 개인 AI 에이전트를 운영하는 프�
 - **🚀 시작 가이드** 마법사: Node.js/Claude CLI/Claude 로그인/Discord 플러그인/Bun까지 버튼 클릭으로 확인·설치
 - 새 에이전트 생성: 이름·역할·Notion 역할 페이지 링크·Discord 봇 토큰을 입력하면 `.claude/settings.json` + `CLAUDE.md`를 자동 생성
 - 에이전트별 Claude Code 세션을 실제 터미널(대화형)로 시작/중지, 시작 시 CLAUDE.md/Notion 역할 페이지 자동 숙지 지시
-- Discord 접근 관리: 페어링 승인/거절, 허용된 사용자·채널 목록 관리 (메모 포함)
+- Discord 접근 관리: 페어링 승인/거절, 허용된 사용자·채널 목록 관리 (메모 포함), 채널별 멘션 필요 여부 토글(끄면 그 채널 모든 메시지에 무조건 답장)
 - Notion 워크스페이스 연결: 브라우저 OAuth 자동 실행, 연결된 워크스페이스 이름 자동 조회
 - Windows 네이티브 또는 WSL 중 실행 환경 선택 (에이전트별로 다르게 지정 가능)
 - 이미 폴더만 있는(런처로 안 만든) 기존 에이전트를 자동 감지해서 가져오기

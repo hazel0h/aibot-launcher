@@ -458,6 +458,24 @@ async function refreshDiscordAccessModal() {
         const r = await window.api.agents.addDiscordChannel(currentAgent.name, c.id, labelInput.value.trim());
         if (!r.ok) alert(r.error);
       });
+      const mentionLabel = document.createElement('label');
+      mentionLabel.style.cssText = 'flex-direction: row; align-items: center; gap: 4px; margin: 0; flex-shrink: 0; font-size: 11px; color: #aaa;';
+      const mentionCheckbox = document.createElement('input');
+      mentionCheckbox.type = 'checkbox';
+      mentionCheckbox.style.width = 'auto';
+      // 체크 = 멘션 필요(기본), 해제 = 멘션 없이도 그 채널 모든 메시지에 바로 답장(1:1처럼)
+      mentionCheckbox.checked = c.requireMention;
+      mentionCheckbox.title = '켜짐: @멘션해야 반응 / 꺼짐: 멘션 없이 모든 메시지에 바로 답장';
+      mentionCheckbox.addEventListener('change', async () => {
+        const r = await window.api.agents.setChannelRequireMention(currentAgent.name, c.id, mentionCheckbox.checked);
+        if (!r.ok) {
+          alert(r.error);
+          mentionCheckbox.checked = !mentionCheckbox.checked;
+        }
+      });
+      mentionLabel.appendChild(mentionCheckbox);
+      mentionLabel.appendChild(document.createTextNode('멘션 필요'));
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'btn ghost';
       removeBtn.textContent = '삭제';
@@ -469,6 +487,7 @@ async function refreshDiscordAccessModal() {
       });
       li.appendChild(idSpan);
       li.appendChild(labelInput);
+      li.appendChild(mentionLabel);
       li.appendChild(removeBtn);
       channelList.appendChild(li);
     }
