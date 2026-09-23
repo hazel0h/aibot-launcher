@@ -147,6 +147,7 @@
         · 끄면 다시 공용(기본) 계정을 씁니다
       </p>
 
+      <h2 style="font-size: 15px; margin: 20px 0 4px;">MCP 연결</h2>
       <h3>Notion 워크스페이스</h3>
       <label>현재 연결된 워크스페이스 (여기서는 수정 불가)
         <input id="edit-notion-workspace-label" type="text" placeholder="아직 연결 안 함" readonly />
@@ -157,6 +158,28 @@
       </p>
       <div class="modal-actions" style="justify-content: flex-start;">
         <button id="btn-connect-notion" class="btn ghost">🔗 Notion 워크스페이스 연결/변경</button>
+      </div>
+
+      <h3>Vercel</h3>
+      <div id="edit-vercel-status" class="check-result">확인 전</div>
+      <p class="hint small">
+        · Vercel도 OAuth 방식이라 최초 1회는 브라우저 로그인이 필요합니다
+      </p>
+      <div class="modal-actions" style="justify-content: flex-start;">
+        <button id="btn-connect-vercel" class="btn ghost">🔗 Vercel 연결/변경</button>
+      </div>
+
+      <h3>Supabase</h3>
+      <div id="edit-supabase-status" class="check-result">확인 전</div>
+      <label>Supabase 액세스 토큰
+        <input id="edit-supabase-token" type="password" placeholder="Supabase 대시보드 → Account → Access Tokens에서 발급" />
+      </label>
+      <p class="hint small">
+        · 토큰 방식이라 브라우저 로그인 없이 바로 연결됩니다<br />
+        · 이 토큰은 로컬에만 잠깐 쓰이고 런처 데이터에는 저장되지 않습니다 (재연결 시 다시 입력 필요)
+      </p>
+      <div class="modal-actions" style="justify-content: flex-start;">
+        <button id="btn-connect-supabase" class="btn ghost">🔗 Supabase 연결</button>
       </div>
 
       <div class="modal-actions">

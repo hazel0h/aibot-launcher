@@ -254,8 +254,31 @@ el('btn-edit-agent').addEventListener('click', () => {
   el('edit-auto-read').checked = currentAgent.autoReadOnStart !== false;
   el('edit-separate-claude').checked = !!currentAgent.separateClaude;
   el('edit-agent-error').classList.add('hidden');
+  el('edit-supabase-token').value = '';
+  setCheckResult('edit-vercel-status', true, '확인 중...');
+  setCheckResult('edit-supabase-status', true, '확인 중...');
   el('modal-edit-agent').classList.remove('hidden');
+  refreshVercelStatus(currentAgent.name);
+  refreshSupabaseStatus(currentAgent.name);
 });
+
+async function refreshVercelStatus(agentName) {
+  const r = await window.api.agents.getVercelStatus(agentName);
+  const status = r.ok ? r.result.status : 'none';
+  setCheckResult('edit-vercel-status', status === 'connected', mcpStatusText(status));
+}
+
+async function refreshSupabaseStatus(agentName) {
+  const r = await window.api.agents.getSupabaseStatus(agentName);
+  const status = r.ok ? r.result.status : 'none';
+  setCheckResult('edit-supabase-status', status === 'connected', mcpStatusText(status));
+}
+
+function mcpStatusText(status) {
+  if (status === 'connected') return '연결됨';
+  if (status === 'pending') return '등록됨 (로그인 필요)';
+  return '연결 안 됨';
+}
 
 el('btn-cancel-edit').addEventListener('click', () => {
   el('modal-edit-agent').classList.add('hidden');
@@ -324,8 +347,77 @@ el('btn-connect-notion').addEventListener('click', async () => {
   }, 5000);
 });
 
-el('btn-cancel-edit').addEventListener('click', stopNotionPolling);
-el('btn-save-edit').addEventListener('click', stopNotionPolling);
+let vercelPollTimer = null;
+function stopVercelPolling() {
+  if (vercelPollTimer) {
+    clearInterval(vercelPollTimer);
+    vercelPollTimer = null;
+  }
+}
+
+el('btn-connect-vercel').addEventListener('click', async () => {
+  if (!currentAgent) return;
+  const agentName = currentAgent.name;
+
+  const res = await window.api.agents.connectVercelWorkspace(agentName);
+  if (!res.ok) {
+    alert(res.error);
+    return;
+  }
+  alert('잠시 후 브라우저가 열립니다. Vercel 계정으로 로그인/선택해주세요.\n로그인을 마치면 위 상태가 잠시 후 자동으로 "연결됨"으로 바뀝니다.');
+
+  setCheckResult('edit-vercel-status', true, '연결 확인 중...');
+  stopVercelPolling();
+  let attempts = 0;
+  vercelPollTimer = setInterval(async () => {
+    attempts++;
+    await refreshVercelStatus(agentName);
+    const r = await window.api.agents.getVercelStatus(agentName);
+    if (r.ok && r.result.status === 'connected') {
+      stopVercelPolling();
+      return;
+    }
+    if (attempts >= 24) stopVercelPolling(); // 2분(24 * 5초) 지나도 안 되면 그만 확인
+  }, 5000);
+});
+
+el('btn-connect-supabase').addEventListener('click', async () => {
+  if (!currentAgent) return;
+  const agentName = currentAgent.name;
+  const token = el('edit-supabase-token').value;
+  if (!token.trim()) {
+    alert('Supabase 액세스 토큰을 입력해주세요.');
+    return;
+  }
+
+  const btn = el('btn-connect-supabase');
+  btn.disabled = true;
+  setCheckResult('edit-supabase-status', true, '연결 중...');
+  const res = await window.api.agents.connectSupabaseMcp(agentName, token);
+  btn.disabled = false;
+  if (!res.ok) {
+    setCheckResult('edit-supabase-status', false, `연결 실패: ${res.error}`);
+    return;
+  }
+  el('edit-supabase-token').value = '';
+  // npx가 패키지를 처음 받아오는 동안은 상태 조회도 잠깐 걸릴 수 있어 몇 번 재확인한다.
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    await refreshSupabaseStatus(agentName);
+    const r = await window.api.agents.getSupabaseStatus(agentName);
+    if ((r.ok && r.result.status !== 'none') || attempts >= 6) clearInterval(poll);
+  }, 3000);
+});
+
+el('btn-cancel-edit').addEventListener('click', () => {
+  stopNotionPolling();
+  stopVercelPolling();
+});
+el('btn-save-edit').addEventListener('click', () => {
+  stopNotionPolling();
+  stopVercelPolling();
+});
 
 // ---- settings ----
 el('btn-settings').addEventListener('click', async () => {

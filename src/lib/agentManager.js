@@ -372,12 +372,15 @@ function addDiscordChannel(name, channelIdOrLink, label) {
 //
 // `claude mcp login`은 브라우저에서 로그인이 끝날 때까지 프로세스가 안 끝날 수 있어서
 // (동기 실행하면 런처 전체가 멈춘다) 백그라운드로 띄우고 결과를 기다리지 않는다.
-function connectNotionWorkspace(name) {
+// Notion/Vercel처럼 "URL 등록 + 브라우저 OAuth 로그인"이 필요한 원격 HTTP MCP 공통 처리.
+// mcp add는 stdio 파이프로도 동작하지만, mcp login은 "stdin이 터미널이어야" 진행되는
+// 대화형 명령이라 일반 child_process(파이프/ignore)로는 즉시 거부된다 - 실제 터미널(pty)로 띄운다.
+function connectHttpMcp(name, mcpName, mcpUrl) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
 
-  const addArgs = ['mcp', 'add', '--transport', 'http', 'notion', 'https://mcp.notion.com/mcp'];
+  const addArgs = ['mcp', 'add', '--transport', 'http', mcpName, mcpUrl];
 
   if (agent.runtime === 'wsl') {
     const wslFolder = wsl.toWslPath(agent.folder);
@@ -388,9 +391,7 @@ function connectNotionWorkspace(name) {
     } catch (e) {
       // 이미 등록돼 있으면 실패할 수 있음 - 로그인은 계속 진행
     }
-    // claude mcp login은 "stdin이 터미널이어야" 진행되는 대화형 명령이라
-    // 일반 child_process(파이프/ignore)로는 즉시 거부된다. 실제 터미널(pty)로 띄운다.
-    pty.spawn(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp login notion`], {
+    pty.spawn(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp login ${mcpName}`], {
       name: 'xterm-color',
       cols: 100,
       rows: 30,
@@ -413,7 +414,7 @@ function connectNotionWorkspace(name) {
   }
 
   const exe = sessionManager.resolveClaudeExecutable();
-  pty.spawn(exe, ['mcp', 'login', 'notion'], {
+  pty.spawn(exe, ['mcp', 'login', mcpName], {
     name: 'xterm-color',
     cols: 100,
     rows: 30,
@@ -422,16 +423,16 @@ function connectNotionWorkspace(name) {
   });
 }
 
-function getNotionMcpStatus(agent) {
+function getMcpStatus(agent, mcpName) {
   try {
     let out;
     if (agent.runtime === 'wsl') {
       const wslFolder = wsl.toWslPath(agent.folder);
-      out = execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp get notion`], {
+      out = execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp get ${mcpName}`], {
         encoding: 'utf-8'
       });
     } else {
-      out = execFileSync('claude', ['mcp', 'get', 'notion'], {
+      out = execFileSync('claude', ['mcp', 'get', mcpName], {
         cwd: agent.folder,
         encoding: 'utf-8',
         shell: true,
@@ -442,6 +443,62 @@ function getNotionMcpStatus(agent) {
   } catch (e) {
     return 'none';
   }
+}
+
+function connectNotionWorkspace(name) {
+  connectHttpMcp(name, 'notion', 'https://mcp.notion.com/mcp');
+}
+
+function getNotionMcpStatus(agent) {
+  return getMcpStatus(agent, 'notion');
+}
+
+function connectVercelWorkspace(name) {
+  connectHttpMcp(name, 'vercel', 'https://mcp.vercel.com/');
+}
+
+function getVercelStatus(name) {
+  const data = store.load();
+  const agent = data.agents.find((a) => a.name === name);
+  if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
+  return { status: getMcpStatus(agent, 'vercel') };
+}
+
+// Supabase는 OAuth가 아니라 Personal Access Token 방식이라 브라우저 로그인 단계가 없다 -
+// 토큰을 --env로 바로 넘겨서 등록하면 그걸로 끝(비대화형, pty 불필요). 토큰 자체는 claude
+// 자신의 설정 파일(~/.claude.json 등)에 등록되고, 런처 쪽 데이터에는 따로 저장하지 않는다
+// (같은 비밀값을 두 군데에 중복 보관하지 않기 위함 - 재연결하려면 토큰을 다시 입력).
+function connectSupabaseMcp(name, accessToken) {
+  const data = store.load();
+  const agent = data.agents.find((a) => a.name === name);
+  if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
+  if (!accessToken || !accessToken.trim()) throw new Error('Supabase 액세스 토큰을 입력해주세요.');
+
+  const token = accessToken.trim();
+  const addArgs = ['mcp', 'add', 'supabase', '--env', `SUPABASE_ACCESS_TOKEN=${token}`, '--', 'npx', '-y', '@supabase/mcp-server-supabase@latest'];
+
+  if (agent.runtime === 'wsl') {
+    const wslFolder = wsl.toWslPath(agent.folder);
+    const quoted = addArgs.map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(' ');
+    execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude ${quoted}`], {
+      stdio: 'ignore'
+    });
+    return;
+  }
+
+  execFileSync('claude', addArgs, {
+    cwd: agent.folder,
+    stdio: 'ignore',
+    shell: true,
+    env: envWithFreshPath(agentClaudeEnv(agent))
+  });
+}
+
+function getSupabaseStatus(name) {
+  const data = store.load();
+  const agent = data.agents.find((a) => a.name === name);
+  if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
+  return { status: getMcpStatus(agent, 'supabase') };
 }
 
 // 연결 상태를 확인하고, 연결됐으면 Notion MCP에게 직접 물어봐서(원샷 프롬프트) 워크스페이스
@@ -696,6 +753,10 @@ module.exports = {
   setChannelRequireMention,
   connectNotionWorkspace,
   refreshNotionWorkspaceLabel,
+  connectVercelWorkspace,
+  getVercelStatus,
+  connectSupabaseMcp,
+  getSupabaseStatus,
   scanUnregisteredAgents,
   importAgent,
   getSettings,

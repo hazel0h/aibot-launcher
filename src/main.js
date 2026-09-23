@@ -343,6 +343,40 @@ ipcMain.handle('agents:refreshNotionWorkspaceLabel', (_e, name) => {
   }
 });
 
+ipcMain.handle('agents:connectVercelWorkspace', (_e, name) => {
+  try {
+    agentManager.connectVercelWorkspace(name);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('agents:getVercelStatus', (_e, name) => {
+  try {
+    return { ok: true, result: agentManager.getVercelStatus(name) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('agents:connectSupabaseMcp', (_e, { name, accessToken }) => {
+  try {
+    agentManager.connectSupabaseMcp(name, accessToken);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('agents:getSupabaseStatus', (_e, name) => {
+  try {
+    return { ok: true, result: agentManager.getSupabaseStatus(name) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('app:quit', () => {
   isQuitting = true;
   app.quit();
