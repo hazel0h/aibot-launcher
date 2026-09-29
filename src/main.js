@@ -1,11 +1,40 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
 const agentManager = require('./lib/agentManager');
 const sessionManager = require('./lib/sessionManager');
 const setupManager = require('./lib/setupManager');
 const updateToken = require('./lib/updateToken');
+const store = require('./lib/store');
+
+// 업데이트 확인이 조용히(에러를 그냥 버리고) 실패해서 껐다 켜도 새 버전이 안 잡히는
+// 문제가 있었다 - GitHub API가 이 세션 내내 종종 socket hang up/ECONNABORTED로
+// 실패하는 걸 여러 번 봐서, checkForUpdates도 같은 이유로 조용히 실패했을 가능성이
+// 높다. 재시도 + 로그를 남겨서 다음에 또 이러면 원인을 바로 알 수 있게 한다.
+const UPDATE_LOG_PATH = path.join(path.dirname(store.DATA_FILE), 'update-check.log');
+function logUpdateCheck(msg) {
+  try {
+    fs.appendFileSync(UPDATE_LOG_PATH, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch (e) {
+    // 로그조차 못 남기면 그냥 넘어간다 - 업데이트 확인 자체를 막을 이유는 아님
+  }
+}
+
+async function checkForUpdatesWithRetry(attempts = 3) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      const latest = result && result.updateInfo && result.updateInfo.version;
+      logUpdateCheck(`체크 성공 (시도 ${i}/${attempts}) - 현재 버전: ${app.getVersion()}, 최신 버전: ${latest}`);
+      return;
+    } catch (err) {
+      logUpdateCheck(`체크 실패 (시도 ${i}/${attempts}): ${err.message}`);
+      if (i < attempts) await new Promise((resolve) => setTimeout(resolve, 5000 * i));
+    }
+  }
+}
 
 // 저장소가 비공개라 릴리스 확인 API 호출에도 인증이 필요하다. 이 토큰은
 // "Contents: Read-only"로만 스코프된 이 저장소 전용 토큰이어야 한다
@@ -124,8 +153,10 @@ if (gotLock) {
 
     // 개발 중(npm start, 패키징 안 된 상태)에는 업데이트 확인을 시도하면
     // "찾을 수 없음" 에러만 나므로 실제로 설치된 앱에서만 확인한다.
+    // 앱을 켤 때 한 번뿐 아니라, 오래 켜둔 채로 쓸 수도 있으니 주기적으로도 다시 확인한다.
     if (app.isPackaged) {
-      autoUpdater.checkForUpdates().catch(() => {});
+      checkForUpdatesWithRetry();
+      setInterval(() => checkForUpdatesWithRetry(), 4 * 60 * 60 * 1000);
     }
 
     setInterval(checkDailyReports, 60 * 1000);
@@ -186,7 +217,12 @@ function checkDailyReports() {
   }
 }
 
+autoUpdater.on('error', (err) => {
+  logUpdateCheck(`autoUpdater 에러(다운로드 등): ${err ? (err.stack || err.message || err) : 'unknown'}`);
+});
+
 autoUpdater.on('update-downloaded', (info) => {
+  logUpdateCheck(`다운로드 완료 - 버전 ${info && info.version}, 재시작 대기 중`);
   dialog
     .showMessageBox(mainWindow, {
       type: 'info',
