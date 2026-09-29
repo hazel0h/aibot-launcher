@@ -7,6 +7,7 @@ const wsl = require('./wsl');
 const sessionManager = require('./sessionManager');
 const { envWithFreshPath } = require('./freshEnv');
 const { agentClaudeEnv, wslEnvPrefix, windowsConfigDir } = require('./claudeAccount');
+const { discordHookScriptPath } = require('./hookPaths');
 
 function slugify(name) {
   return name
@@ -121,6 +122,10 @@ function createAgent({ name, roleOneLiner, notionUrl, discordToken, runtime, sep
     discordToken: discordToken || '',
     autoReadOnStart: true,
     separateClaude: !!separateClaude,
+    discordHookEnabled: true,
+    dailyReportEnabled: false,
+    dailyReportTime: '09:00',
+    dailyReportPrompt: '',
     createdAt: new Date().toISOString()
   };
 
@@ -129,7 +134,20 @@ function createAgent({ name, roleOneLiner, notionUrl, discordToken, runtime, sep
   return agent;
 }
 
-function updateAgent(name, { roleOneLiner, notionUrl, discordToken, autoReadOnStart, separateClaude }) {
+function updateAgent(
+  name,
+  {
+    roleOneLiner,
+    notionUrl,
+    discordToken,
+    autoReadOnStart,
+    separateClaude,
+    discordHookEnabled,
+    dailyReportEnabled,
+    dailyReportTime,
+    dailyReportPrompt
+  }
+) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
@@ -137,6 +155,10 @@ function updateAgent(name, { roleOneLiner, notionUrl, discordToken, autoReadOnSt
   if (roleOneLiner !== undefined) agent.roleOneLiner = roleOneLiner;
   if (notionUrl !== undefined) agent.notionUrl = notionUrl;
   if (autoReadOnStart !== undefined) agent.autoReadOnStart = autoReadOnStart;
+  if (discordHookEnabled !== undefined) agent.discordHookEnabled = discordHookEnabled;
+  if (dailyReportEnabled !== undefined) agent.dailyReportEnabled = dailyReportEnabled;
+  if (dailyReportTime !== undefined && /^\d{2}:\d{2}$/.test(dailyReportTime)) agent.dailyReportTime = dailyReportTime;
+  if (dailyReportPrompt !== undefined) agent.dailyReportPrompt = dailyReportPrompt;
   if (separateClaude !== undefined && !!separateClaude !== !!agent.separateClaude) {
     // 공용<->전용 전환: 설정 폴더가 바뀌므로 플러그인 준비 여부와 Notion 워크스페이스 표시를 초기화
     agent.separateClaude = !!separateClaude;
@@ -166,6 +188,22 @@ function updateAgent(name, { roleOneLiner, notionUrl, discordToken, autoReadOnSt
 
 function listAgents() {
   return store.load().agents;
+}
+
+// 매일 정해진 시간에 하루 보고 + 메모리 저장 + 세션 재시작을 시키는 기본 프롬프트.
+// 에이전트별로 dailyReportPrompt에 직접 적어두면 이 기본값 대신 그걸 쓴다.
+const DEFAULT_DAILY_REPORT_PROMPT =
+  '오늘 하루 있었던 일을 정리해줘. 정리한 내용을 노션의 네 기록 위치(패치노트/작업 로그 등 해당하는 곳)에 남기고, ' +
+  '중요한 내용이면 알아두면 좋은 사람에게 Discord로도 간단히 보고해줘. 다 끝나면 이 세션은 잠시 후 자동으로 재시작될 예정이니, ' +
+  '재시작 전에 꼭 남겨야 할 메모가 있으면 지금 노션에 적어둬.';
+
+// 스케줄러(main.js)가 오늘 이미 보냈는지 판단하는 데 쓴다 - 하루에 한 번만 보내야 하므로.
+function markDailyReportSent(name, dateStr) {
+  const data = store.load();
+  const agent = data.agents.find((a) => a.name === name);
+  if (!agent) return;
+  agent.lastDailyReportDate = dateStr;
+  store.save(data);
 }
 
 function sleep(ms) {
@@ -251,6 +289,26 @@ function writeDiscordEnv(agent) {
 // 가리키는 "맞는" 경로에 있는데 정작 세션은 "틀린"(존재하지 않는) 경로를 보는 불일치가
 // 생겼다(실사용자 리포트로 확인). launcher-data.json의 discordStateDir을 항상 정답으로 두고,
 // 세션 시작 때마다 settings.json을 그 값으로 덮어써서 어긋날 수 없게 한다.
+const HOOK_MARKER = 'discord-enforce.js';
+
+// "디스코드로만 답할 것 / 확인 즉시 리액션 / 항상 reply_to" 세 가지를 텍스트 지시가
+// 아니라 실행되는 훅으로 강제한다 (hooks/discord-enforce.js 참고, 대화가 길어져도
+// 안 풀림). WSL 에이전트는 Claude Code가 WSL 안에서 실행되므로, 스크립트 경로도
+// Windows 경로가 아니라 /mnt/... 경로로 넘겨야 한다.
+function buildDiscordHookConfig(agent) {
+  const winPath = discordHookScriptPath();
+  const scriptPath = agent.runtime === 'wsl' ? wsl.toWslPath(winPath) : winPath;
+  const cmd = (event) => `node "${scriptPath}" ${event}`;
+  return {
+    UserPromptSubmit: [{ hooks: [{ type: 'command', command: cmd('user-prompt-submit') }] }],
+    PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: cmd('pre-tool-use') }] }]
+  };
+}
+
+function isOurHookEntry(entry) {
+  return (entry.hooks || []).some((h) => typeof h.command === 'string' && h.command.includes(HOOK_MARKER));
+}
+
 function syncAgentSettingsJson(agent) {
   const settingsPath = path.join(agent.folder, '.claude', 'settings.json');
   let parsed = {};
@@ -260,6 +318,24 @@ function syncAgentSettingsJson(agent) {
     // 파일이 없거나 손상됐으면 새로 만든다 - env 외 다른 키는 있으면 그대로 보존
   }
   parsed.env = { ...(parsed.env || {}), DISCORD_STATE_DIR: agent.discordStateDir };
+
+  if (agent.discordHookEnabled) {
+    const ours = buildDiscordHookConfig(agent);
+    parsed.hooks = parsed.hooks || {};
+    for (const key of Object.keys(ours)) {
+      const others = (parsed.hooks[key] || []).filter((entry) => !isOurHookEntry(entry));
+      parsed.hooks[key] = [...others, ...ours[key]];
+    }
+  } else if (parsed.hooks) {
+    // 꺼진 경우 우리가 등록했던 항목만 제거한다 - 사용자가 직접 추가한 다른 훅은 안 건드림
+    for (const key of Object.keys(parsed.hooks)) {
+      if (!Array.isArray(parsed.hooks[key])) continue;
+      parsed.hooks[key] = parsed.hooks[key].filter((entry) => !isOurHookEntry(entry));
+      if (parsed.hooks[key].length === 0) delete parsed.hooks[key];
+    }
+    if (Object.keys(parsed.hooks).length === 0) delete parsed.hooks;
+  }
+
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
 }
@@ -738,6 +814,8 @@ module.exports = {
   createAgent,
   updateAgent,
   listAgents,
+  markDailyReportSent,
+  DEFAULT_DAILY_REPORT_PROMPT,
   deleteAgent,
   checkDiscordStateDir,
   ensureDiscordConfigured,

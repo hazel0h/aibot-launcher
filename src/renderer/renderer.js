@@ -214,6 +214,7 @@ el('btn-new-agent').addEventListener('click', () => {
   el('new-notion').value = '';
   el('new-token').value = '';
   el('new-separate-claude').checked = false;
+  el('new-discord-hook').checked = true;
   el('new-runtime').value = 'windows';
   el('new-agent-error').classList.add('hidden');
   el('modal-new-agent').classList.remove('hidden');
@@ -230,7 +231,8 @@ el('btn-create-agent').addEventListener('click', async () => {
     notionUrl: el('new-notion').value.trim(),
     discordToken: el('new-token').value,
     runtime: el('new-runtime').value,
-    separateClaude: el('new-separate-claude').checked
+    separateClaude: el('new-separate-claude').checked,
+    discordHookEnabled: el('new-discord-hook').checked
   };
   const res = await window.api.agents.create(payload);
   if (!res.ok) {
@@ -253,6 +255,10 @@ el('btn-edit-agent').addEventListener('click', () => {
   el('edit-notion-workspace-label').value = currentAgent.notionWorkspaceLabel || '';
   el('edit-auto-read').checked = currentAgent.autoReadOnStart !== false;
   el('edit-separate-claude').checked = !!currentAgent.separateClaude;
+  el('edit-discord-hook').checked = currentAgent.discordHookEnabled !== false;
+  el('edit-daily-report').checked = !!currentAgent.dailyReportEnabled;
+  el('edit-daily-report-time').value = currentAgent.dailyReportTime || '09:00';
+  el('edit-daily-report-prompt').value = currentAgent.dailyReportPrompt || '';
   el('edit-agent-error').classList.add('hidden');
   el('edit-supabase-token').value = '';
   setCheckResult('edit-vercel-status', true, '확인 중...');
@@ -290,7 +296,11 @@ el('btn-save-edit').addEventListener('click', async () => {
     roleOneLiner: el('edit-role').value.trim(),
     notionUrl: el('edit-notion').value.trim(),
     autoReadOnStart: el('edit-auto-read').checked,
-    separateClaude: el('edit-separate-claude').checked
+    separateClaude: el('edit-separate-claude').checked,
+    discordHookEnabled: el('edit-discord-hook').checked,
+    dailyReportEnabled: el('edit-daily-report').checked,
+    dailyReportTime: el('edit-daily-report-time').value,
+    dailyReportPrompt: el('edit-daily-report-prompt').value.trim()
   };
   const token = el('edit-token').value;
   if (token) patch.discordToken = token;

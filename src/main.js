@@ -127,7 +127,63 @@ if (gotLock) {
     if (app.isPackaged) {
       autoUpdater.checkForUpdates().catch(() => {});
     }
+
+    setInterval(checkDailyReports, 60 * 1000);
   });
+}
+
+// 매일 정해진 시간에: 세션이 켜져 있으면 "하루 보고 남기고 메모리 저장해줘" 프롬프트를
+// 넣어주고, 일정 시간 뒤(보고를 다 쓸 시간을 주고) 세션을 중지→재시작한다. 완료를
+// 정확히 감지할 방법이 없어(터미널 출력을 파싱해야 함, 신뢰성 낮음) 넉넉한 고정
+// 대기시간을 쓰는 단순한 방식 - AUTO_ROLE_PROMPT 지연 방식과 같은 타협이다.
+const REPORT_WRITE_MINUTES = 5;
+
+function todayLocalDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function nowHHMM() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function checkDailyReports() {
+  const today = todayLocalDateStr();
+  const nowStr = nowHHMM();
+  for (const agent of agentManager.listAgents()) {
+    if (!agent.dailyReportEnabled) continue;
+    if (agent.dailyReportTime !== nowStr) continue;
+    if (agent.lastDailyReportDate === today) continue; // 이 분(HH:MM) 동안 이미 처리함
+    if (!sessionManager.getStatus(agent.name).running) continue; // 꺼져 있으면 스킵
+
+    agentManager.markDailyReportSent(agent.name, today);
+
+    const prompt = (agent.dailyReportPrompt && agent.dailyReportPrompt.trim()) || agentManager.DEFAULT_DAILY_REPORT_PROMPT;
+    try {
+      sessionManager.writeInput(agent.name, prompt + '\r');
+    } catch (e) {
+      continue; // 그 사이 세션이 꺼졌을 수 있음
+    }
+
+    setTimeout(async () => {
+      try {
+        if (!sessionManager.getStatus(agent.name).running) return;
+        sessionManager.stopSession(agent.name);
+        // claude 프로세스 종료 + 파일 핸들 정리에 약간의 여유를 준다(에이전트 삭제 때와 같은 이유).
+        setTimeout(async () => {
+          try {
+            const fresh = agentManager.listAgents().find((a) => a.name === agent.name);
+            if (fresh) await startAgentSession(fresh, 100, 30);
+          } catch (e) {
+            // 재시작 실패 - 다음 세션 시작은 사용자가 수동으로
+          }
+        }, 3000);
+      } catch (e) {
+        // 이미 꺼져 있는 등 - 무시
+      }
+    }, REPORT_WRITE_MINUTES * 60 * 1000);
+  }
 }
 
 autoUpdater.on('update-downloaded', (info) => {
@@ -387,11 +443,17 @@ ipcMain.handle('settings:update', (_e, partial) => agentManager.updateSettings(p
 ipcMain.handle('settings:detectWslBase', () => agentManager.detectWslDiscordStateBase());
 
 // ---- IPC: sessions ----
+// IPC 핸들러와 일일 보고 스케줄러(아래) 둘 다 "세션 시작 전 준비"가 똑같이 필요해서
+// 하나로 뽑아둔다.
+async function startAgentSession(agent, cols, rows) {
+  agentManager.ensureDiscordConfigured(agent);
+  await agentManager.ensureSeparateClaudeReady(agent);
+  sessionManager.startSession(agent, { cols, rows });
+}
+
 ipcMain.handle('session:start', async (_e, { agent, cols, rows }) => {
   try {
-    agentManager.ensureDiscordConfigured(agent);
-    await agentManager.ensureSeparateClaudeReady(agent);
-    sessionManager.startSession(agent, { cols, rows });
+    await startAgentSession(agent, cols, rows);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message };
