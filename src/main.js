@@ -452,6 +452,14 @@ ipcMain.handle('agents:getVercelStatus', (_e, name) => {
   }
 });
 
+ipcMain.handle('agents:refreshVercelAccountLabel', (_e, name) => {
+  try {
+    return { ok: true, result: agentManager.refreshVercelAccountLabel(name) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('agents:connectSupabaseMcp', (_e, { name, accessToken }) => {
   try {
     agentManager.connectSupabaseMcp(name, accessToken);
@@ -464,6 +472,14 @@ ipcMain.handle('agents:connectSupabaseMcp', (_e, { name, accessToken }) => {
 ipcMain.handle('agents:getSupabaseStatus', (_e, name) => {
   try {
     return { ok: true, result: agentManager.getSupabaseStatus(name) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('agents:refreshSupabaseAccountLabel', (_e, name) => {
+  try {
+    return { ok: true, result: agentManager.refreshSupabaseAccountLabel(name) };
   } catch (err) {
     return { ok: false, error: err.message };
   }

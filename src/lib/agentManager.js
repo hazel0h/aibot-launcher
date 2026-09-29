@@ -580,17 +580,19 @@ function getSupabaseStatus(name) {
 // 연결 상태를 확인하고, 연결됐으면 Notion MCP에게 직접 물어봐서(원샷 프롬프트) 워크스페이스
 // 이름을 알아내 메모칸에 자동으로 채운다. 사용자가 직접 입력하는 값이 아니라 항상 이 값으로
 // 덮어써서 "지금 실제로 뭐에 연결돼 있는지"를 보여준다.
-function refreshNotionWorkspaceLabel(name) {
+// 연결 상태를 확인하고, 연결됐으면 MCP 자신에게 직접 물어봐서(원샷 프롬프트) "누구로
+// 연결돼있는지"를 알아내 labelField(예: notionWorkspaceLabel)에 자동으로 채운다.
+// Notion/Vercel/Supabase가 전부 같은 방식이라 하나로 뽑았다.
+function refreshMcpAccountLabel(name, mcpName, prompt, labelField) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
 
-  const status = getNotionMcpStatus(agent);
+  const status = getMcpStatus(agent, mcpName);
   if (status !== 'connected') {
-    return { status, label: agent.notionWorkspaceLabel || '' };
+    return { status, label: agent[labelField] || '' };
   }
 
-  const prompt = 'Notion 워크스페이스 이름을 한 줄로만 정확히 답해줘. 다른 설명 없이 이름만.';
   let label = '';
   try {
     let out;
@@ -619,10 +621,37 @@ function refreshNotionWorkspaceLabel(name) {
   }
 
   if (label) {
-    agent.notionWorkspaceLabel = label;
+    agent[labelField] = label;
     store.save(data);
   }
-  return { status, label: agent.notionWorkspaceLabel || '' };
+  return { status, label: agent[labelField] || '' };
+}
+
+function refreshNotionWorkspaceLabel(name) {
+  return refreshMcpAccountLabel(
+    name,
+    'notion',
+    'Notion 워크스페이스 이름을 한 줄로만 정확히 답해줘. 다른 설명 없이 이름만.',
+    'notionWorkspaceLabel'
+  );
+}
+
+function refreshVercelAccountLabel(name) {
+  return refreshMcpAccountLabel(
+    name,
+    'vercel',
+    '지금 연결된 Vercel 계정의 사용자 이름 또는 이메일을 한 줄로만 정확히 답해줘. 다른 설명 없이.',
+    'vercelAccountLabel'
+  );
+}
+
+function refreshSupabaseAccountLabel(name) {
+  return refreshMcpAccountLabel(
+    name,
+    'supabase',
+    '지금 연결된 Supabase 조직 이름을 한 줄로만 정확히 답해줘. 다른 설명 없이.',
+    'supabaseAccountLabel'
+  );
 }
 
 function removeDiscordChannel(name, channelId) {
@@ -833,8 +862,10 @@ module.exports = {
   refreshNotionWorkspaceLabel,
   connectVercelWorkspace,
   getVercelStatus,
+  refreshVercelAccountLabel,
   connectSupabaseMcp,
   getSupabaseStatus,
+  refreshSupabaseAccountLabel,
   scanUnregisteredAgents,
   importAgent,
   getSettings,

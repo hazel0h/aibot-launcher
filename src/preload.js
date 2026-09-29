@@ -25,8 +25,10 @@ contextBridge.exposeInMainWorld('api', {
     refreshNotionWorkspaceLabel: (name) => ipcRenderer.invoke('agents:refreshNotionWorkspaceLabel', name),
     connectVercelWorkspace: (name) => ipcRenderer.invoke('agents:connectVercelWorkspace', name),
     getVercelStatus: (name) => ipcRenderer.invoke('agents:getVercelStatus', name),
+    refreshVercelAccountLabel: (name) => ipcRenderer.invoke('agents:refreshVercelAccountLabel', name),
     connectSupabaseMcp: (name, accessToken) => ipcRenderer.invoke('agents:connectSupabaseMcp', { name, accessToken }),
     getSupabaseStatus: (name) => ipcRenderer.invoke('agents:getSupabaseStatus', name),
+    refreshSupabaseAccountLabel: (name) => ipcRenderer.invoke('agents:refreshSupabaseAccountLabel', name),
     scanUnregistered: () => ipcRenderer.invoke('agents:scanUnregistered'),
     import: (name) => ipcRenderer.invoke('agents:import', name)
   },

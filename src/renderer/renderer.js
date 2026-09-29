@@ -261,6 +261,8 @@ el('btn-edit-agent').addEventListener('click', () => {
   el('edit-daily-report-prompt').value = currentAgent.dailyReportPrompt || '';
   el('edit-agent-error').classList.add('hidden');
   el('edit-supabase-token').value = '';
+  el('edit-vercel-account-label').value = currentAgent.vercelAccountLabel || '';
+  el('edit-supabase-account-label').value = currentAgent.supabaseAccountLabel || '';
   setCheckResult('edit-vercel-status', true, '확인 중...');
   setCheckResult('edit-supabase-status', true, '확인 중...');
   el('modal-edit-agent').classList.remove('hidden');
@@ -268,16 +270,27 @@ el('btn-edit-agent').addEventListener('click', () => {
   refreshSupabaseStatus(currentAgent.name);
 });
 
+// 상태만이 아니라 "누구로 로그인돼있는지"도 같이 물어봐서 채운다(Notion 워크스페이스
+// 이름 표시와 같은 방식) - 연결은 됐는데 계정 확인 질의만 실패할 수도 있어서
+// status와 label을 따로 다룬다.
 async function refreshVercelStatus(agentName) {
-  const r = await window.api.agents.getVercelStatus(agentName);
+  const r = await window.api.agents.refreshVercelAccountLabel(agentName);
   const status = r.ok ? r.result.status : 'none';
   setCheckResult('edit-vercel-status', status === 'connected', mcpStatusText(status));
+  if (r.ok && r.result.label) {
+    el('edit-vercel-account-label').value = r.result.label;
+    if (currentAgent) currentAgent.vercelAccountLabel = r.result.label;
+  }
 }
 
 async function refreshSupabaseStatus(agentName) {
-  const r = await window.api.agents.getSupabaseStatus(agentName);
+  const r = await window.api.agents.refreshSupabaseAccountLabel(agentName);
   const status = r.ok ? r.result.status : 'none';
   setCheckResult('edit-supabase-status', status === 'connected', mcpStatusText(status));
+  if (r.ok && r.result.label) {
+    el('edit-supabase-account-label').value = r.result.label;
+    if (currentAgent) currentAgent.supabaseAccountLabel = r.result.label;
+  }
 }
 
 function mcpStatusText(status) {
