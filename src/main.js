@@ -136,7 +136,7 @@ if (gotLock) {
 // 넣어주고, 일정 시간 뒤(보고를 다 쓸 시간을 주고) 세션을 중지→재시작한다. 완료를
 // 정확히 감지할 방법이 없어(터미널 출력을 파싱해야 함, 신뢰성 낮음) 넉넉한 고정
 // 대기시간을 쓰는 단순한 방식 - AUTO_ROLE_PROMPT 지연 방식과 같은 타협이다.
-const REPORT_WRITE_MINUTES = 5;
+const REPORT_WRITE_MINUTES = 10;
 
 function todayLocalDateStr() {
   const d = new Date();
