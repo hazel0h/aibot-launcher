@@ -266,13 +266,30 @@ el('btn-edit-agent').addEventListener('click', () => {
   setCheckResult('edit-vercel-status', true, '확인 중...');
   setCheckResult('edit-supabase-status', true, '확인 중...');
   el('modal-edit-agent').classList.remove('hidden');
-  refreshVercelStatus(currentAgent.name);
-  refreshSupabaseStatus(currentAgent.name);
+  // 창을 열 때는 "연결됐는지"만 가볍게 확인한다(claude mcp get) - 실제 계정
+  // 이름까지 물어보는 건 MCP한테 진짜 도구 호출을 시키는 무거운 작업이라, 열 때마다
+  // 자동으로 돌리면 느려진다(실사용자 리포트로 확인). 계정 이름은 저장된 값을
+  // 그대로 보여주고, 새로고침은 "연결/변경" 버튼을 눌렀을 때만 한다.
+  checkVercelStatusOnly(currentAgent.name);
+  checkSupabaseStatusOnly(currentAgent.name);
 });
 
+async function checkVercelStatusOnly(agentName) {
+  const r = await window.api.agents.getVercelStatus(agentName);
+  const status = r.ok ? r.result.status : 'none';
+  setCheckResult('edit-vercel-status', status === 'connected', mcpStatusText(status));
+}
+
+async function checkSupabaseStatusOnly(agentName) {
+  const r = await window.api.agents.getSupabaseStatus(agentName);
+  const status = r.ok ? r.result.status : 'none';
+  setCheckResult('edit-supabase-status', status === 'connected', mcpStatusText(status));
+}
+
 // 상태만이 아니라 "누구로 로그인돼있는지"도 같이 물어봐서 채운다(Notion 워크스페이스
-// 이름 표시와 같은 방식) - 연결은 됐는데 계정 확인 질의만 실패할 수도 있어서
-// status와 label을 따로 다룬다.
+// 이름 표시와 같은 방식) - MCP에 실제 도구 호출을 하는 무거운 조회라, "연결/변경"
+// 버튼을 눌러 새로 연결한 직후(폴링 중)에만 쓴다. 연결은 됐는데 계정 확인 질의만
+// 실패할 수도 있어서 status와 label을 따로 다룬다.
 async function refreshVercelStatus(agentName) {
   const r = await window.api.agents.refreshVercelAccountLabel(agentName);
   const status = r.ok ? r.result.status : 'none';
@@ -292,6 +309,18 @@ async function refreshSupabaseStatus(agentName) {
     if (currentAgent) currentAgent.supabaseAccountLabel = r.result.label;
   }
 }
+
+el('btn-refresh-vercel-label').addEventListener('click', async () => {
+  if (!currentAgent) return;
+  setCheckResult('edit-vercel-status', true, '확인 중...');
+  await refreshVercelStatus(currentAgent.name);
+});
+
+el('btn-refresh-supabase-label').addEventListener('click', async () => {
+  if (!currentAgent) return;
+  setCheckResult('edit-supabase-status', true, '확인 중...');
+  await refreshSupabaseStatus(currentAgent.name);
+});
 
 function mcpStatusText(status) {
   if (status === 'connected') return '연결됨';
