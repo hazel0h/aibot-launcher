@@ -469,6 +469,27 @@ el('btn-save-settings').addEventListener('click', async () => {
   alert('저장되었습니다. (기존 에이전트에는 소급 적용되지 않습니다)');
 });
 
+el('btn-check-update-now').addEventListener('click', async () => {
+  const btn = el('btn-check-update-now');
+  btn.disabled = true;
+  btn.textContent = '확인 중...';
+  const r = await window.api.app.checkForUpdatesNow();
+  btn.disabled = false;
+  btn.textContent = '지금 업데이트 확인';
+  if (!r.ok) {
+    alert(r.error);
+    return;
+  }
+  alert('확인했습니다. 새 버전이 있으면 잠시 후(다운로드 완료 시) 재시작 팝업이 뜹니다.\n자세한 결과는 "업데이트 로그 보기"로 확인할 수 있습니다.');
+});
+
+el('btn-show-update-log').addEventListener('click', async () => {
+  const r = await window.api.app.getUpdateLog();
+  const view = el('update-log-view');
+  view.textContent = r.log;
+  view.classList.remove('hidden');
+});
+
 el('btn-quit-app').addEventListener('click', () => {
   if (confirm('런처를 완전히 종료할까요? 실행 중인 모든 에이전트 세션도 함께 종료됩니다.')) {
     window.api.app.quit();
@@ -763,3 +784,7 @@ refreshAgentList();
   const done = await window.api.setup.isWizardDone();
   if (!done) openWizard();
 })();
+
+window.api.app.getVersion().then((v) => {
+  el('app-version').textContent = `v${v}`;
+});

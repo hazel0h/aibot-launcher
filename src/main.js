@@ -427,9 +427,9 @@ ipcMain.handle('agents:connectNotionWorkspace', (_e, name) => {
   }
 });
 
-ipcMain.handle('agents:refreshNotionWorkspaceLabel', (_e, name) => {
+ipcMain.handle('agents:refreshNotionWorkspaceLabel', async (_e, name) => {
   try {
-    return { ok: true, result: agentManager.refreshNotionWorkspaceLabel(name) };
+    return { ok: true, result: await agentManager.refreshNotionWorkspaceLabel(name) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -444,17 +444,17 @@ ipcMain.handle('agents:connectVercelWorkspace', (_e, name) => {
   }
 });
 
-ipcMain.handle('agents:getVercelStatus', (_e, name) => {
+ipcMain.handle('agents:getVercelStatus', async (_e, name) => {
   try {
-    return { ok: true, result: agentManager.getVercelStatus(name) };
+    return { ok: true, result: await agentManager.getVercelStatus(name) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 });
 
-ipcMain.handle('agents:refreshVercelAccountLabel', (_e, name) => {
+ipcMain.handle('agents:refreshVercelAccountLabel', async (_e, name) => {
   try {
-    return { ok: true, result: agentManager.refreshVercelAccountLabel(name) };
+    return { ok: true, result: await agentManager.refreshVercelAccountLabel(name) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -469,17 +469,17 @@ ipcMain.handle('agents:connectSupabaseMcp', (_e, { name, accessToken }) => {
   }
 });
 
-ipcMain.handle('agents:getSupabaseStatus', (_e, name) => {
+ipcMain.handle('agents:getSupabaseStatus', async (_e, name) => {
   try {
-    return { ok: true, result: agentManager.getSupabaseStatus(name) };
+    return { ok: true, result: await agentManager.getSupabaseStatus(name) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 });
 
-ipcMain.handle('agents:refreshSupabaseAccountLabel', (_e, name) => {
+ipcMain.handle('agents:refreshSupabaseAccountLabel', async (_e, name) => {
   try {
-    return { ok: true, result: agentManager.refreshSupabaseAccountLabel(name) };
+    return { ok: true, result: await agentManager.refreshSupabaseAccountLabel(name) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -488,6 +488,23 @@ ipcMain.handle('agents:refreshSupabaseAccountLabel', (_e, name) => {
 ipcMain.handle('app:quit', () => {
   isQuitting = true;
   app.quit();
+});
+
+ipcMain.handle('app:getVersion', () => app.getVersion());
+
+ipcMain.handle('app:getUpdateLog', () => {
+  try {
+    const lines = fs.readFileSync(UPDATE_LOG_PATH, 'utf-8').trim().split('\n');
+    return { ok: true, log: lines.slice(-30).join('\n') };
+  } catch (e) {
+    return { ok: true, log: '(로그 없음 - 아직 업데이트 확인이 한 번도 시도된 적 없거나, v0.1.16 이전 버전)' };
+  }
+});
+
+ipcMain.handle('app:checkForUpdatesNow', async () => {
+  if (!app.isPackaged) return { ok: false, error: '개발 모드에서는 업데이트 확인을 할 수 없습니다.' };
+  await checkForUpdatesWithRetry();
+  return { ok: true };
 });
 
 ipcMain.handle('settings:get', () => agentManager.getSettings());

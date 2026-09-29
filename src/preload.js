@@ -3,7 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   app: {
     quit: () => ipcRenderer.invoke('app:quit'),
-    onRefresh: (cb) => ipcRenderer.on('app:refresh', () => cb())
+    onRefresh: (cb) => ipcRenderer.on('app:refresh', () => cb()),
+    getVersion: () => ipcRenderer.invoke('app:getVersion'),
+    getUpdateLog: () => ipcRenderer.invoke('app:getUpdateLog'),
+    checkForUpdatesNow: () => ipcRenderer.invoke('app:checkForUpdatesNow')
   },
   agents: {
     list: () => ipcRenderer.invoke('agents:list'),

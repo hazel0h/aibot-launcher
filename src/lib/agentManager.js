@@ -499,16 +499,32 @@ function connectHttpMcp(name, mcpName, mcpUrl) {
   });
 }
 
-function getMcpStatus(agent, mcpName) {
+// execFileSync를 메인 프로세스(IPC 핸들러)에서 쓰면 그동안 앱 전체(다른 창 포함)가
+// 멈춘다 - "정보 수정" 열 때마다 이걸 두세 번씩 자동으로 부르다 보니 체감되는 렉의
+// 원인이었다(실사용자 리포트로 확인). execFile(비동기)을 Promise로 감싸서 쓴다.
+function execFileAsync(file, args, options) {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, options, (err, stdout, stderr) => {
+      if (err) {
+        err.stderr = stderr;
+        reject(err);
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
+
+async function getMcpStatus(agent, mcpName) {
   try {
     let out;
     if (agent.runtime === 'wsl') {
       const wslFolder = wsl.toWslPath(agent.folder);
-      out = execFileSync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp get ${mcpName}`], {
+      out = await execFileAsync(wsl.WSL_EXE, ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude mcp get ${mcpName}`], {
         encoding: 'utf-8'
       });
     } else {
-      out = execFileSync('claude', ['mcp', 'get', mcpName], {
+      out = await execFileAsync('claude', ['mcp', 'get', mcpName], {
         cwd: agent.folder,
         encoding: 'utf-8',
         shell: true,
@@ -533,11 +549,11 @@ function connectVercelWorkspace(name) {
   connectHttpMcp(name, 'vercel', 'https://mcp.vercel.com/');
 }
 
-function getVercelStatus(name) {
+async function getVercelStatus(name) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
-  return { status: getMcpStatus(agent, 'vercel') };
+  return { status: await getMcpStatus(agent, 'vercel') };
 }
 
 // Supabase는 OAuth가 아니라 Personal Access Token 방식이라 브라우저 로그인 단계가 없다 -
@@ -570,11 +586,11 @@ function connectSupabaseMcp(name, accessToken) {
   });
 }
 
-function getSupabaseStatus(name) {
+async function getSupabaseStatus(name) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
-  return { status: getMcpStatus(agent, 'supabase') };
+  return { status: await getMcpStatus(agent, 'supabase') };
 }
 
 // 연결 상태를 확인하고, 연결됐으면 Notion MCP에게 직접 물어봐서(원샷 프롬프트) 워크스페이스
@@ -583,12 +599,12 @@ function getSupabaseStatus(name) {
 // 연결 상태를 확인하고, 연결됐으면 MCP 자신에게 직접 물어봐서(원샷 프롬프트) "누구로
 // 연결돼있는지"를 알아내 labelField(예: notionWorkspaceLabel)에 자동으로 채운다.
 // Notion/Vercel/Supabase가 전부 같은 방식이라 하나로 뽑았다.
-function refreshMcpAccountLabel(name, mcpName, prompt, labelField) {
+async function refreshMcpAccountLabel(name, mcpName, prompt, labelField) {
   const data = store.load();
   const agent = data.agents.find((a) => a.name === name);
   if (!agent) throw new Error(`에이전트를 찾을 수 없습니다: ${name}`);
 
-  const status = getMcpStatus(agent, mcpName);
+  const status = await getMcpStatus(agent, mcpName);
   if (status !== 'connected') {
     return { status, label: agent[labelField] || '' };
   }
@@ -601,13 +617,13 @@ function refreshMcpAccountLabel(name, mcpName, prompt, labelField) {
     // 버튼에서 나온 호출이라 안전하다.
     if (agent.runtime === 'wsl') {
       const wslFolder = wsl.toWslPath(agent.folder);
-      out = execFileSync(
+      out = await execFileAsync(
         wsl.WSL_EXE,
         ['-e', 'bash', '-ic', `cd '${wslFolder}' && ${wslEnvPrefix(agent)}claude --print --permission-mode bypassPermissions '${prompt}'`],
         { encoding: 'utf-8', timeout: 30000 }
       );
     } else {
-      out = execFileSync('claude', ['--print', '--permission-mode', 'bypassPermissions', prompt], {
+      out = await execFileAsync('claude', ['--print', '--permission-mode', 'bypassPermissions', prompt], {
         cwd: agent.folder,
         encoding: 'utf-8',
         timeout: 30000,
