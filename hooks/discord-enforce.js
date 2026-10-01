@@ -64,7 +64,8 @@ function main() {
     // 터미널 프롬프트나, 나중에 만들 "매일 자동 보고"처럼 실제 Discord 수신 메시지가
     // 아닌 턴까지 이 규칙에 걸려서 막히면 안 되기 때문.
     const prompt = String(payload.prompt || '');
-    const fromDiscord = /<channel\s+source="discord"/i.test(prompt);
+    // 플러그인 버전에 따라 source가 "discord" 또는 "plugin:discord:discord"로 찍힌다.
+    const fromDiscord = /<channel\s+source="(plugin:discord:)?discord"/i.test(prompt);
     fs.writeFileSync(sp, JSON.stringify({ fromDiscord, reacted: !fromDiscord }), 'utf-8');
     process.exit(0);
   }
